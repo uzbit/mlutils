@@ -15,6 +15,7 @@ from keras.optimizers import SGD
 
 import numpy as np
 import xgboost
+np.random.seed(42)
 
 def buildKeras():
 	model = Sequential()
@@ -76,7 +77,7 @@ class MetaClassifier(object):
 
 	def __init__(self):
 		self.__metaClf = None
-		self.__params = MetaClassifier.getDefaultParams()
+		#self.__params = MetaClassifier.getDefaultParams()
 		self.clfList = list()
 		self.feature_importances_ = list()
 	
@@ -118,45 +119,38 @@ class MetaClassifier(object):
 	
 	def addRF(self, preproc=None, params={}):
 		name = 'RF'
-		self.__updateParams(name, params)
-		self.clfList.append((name, preproc, RandomForestClassifier(**self.__params[name])))
+		self.clfList.append((name, preproc, RandomForestClassifier(**params)))
 
 	def addLR(self, preproc=None, params={}):
 		name = 'LR'
-		self.__updateParams(name, params)
-		self.clfList.append((name, preproc, LogisticRegression(**self.__params[name])))
+		self.clfList.append((name, preproc, LogisticRegression(**params)))
 
 	def addGBC(self, preproc=None, params={}):
 		name = 'GBC'
-		self.__updateParams(name, params)
-		self.clfList.append((name, preproc, GradientBoostingClassifier(**self.__params[name])))
+		self.clfList.append((name, preproc, GradientBoostingClassifier(**params)))
 
 	def addXGBC(self, preproc=None, params={}):
 		name = 'XGBC'
-		self.__updateParams(name, params)
-		self.clfList.append((name, preproc, xgboost.XGBClassifier(**self.__params[name])))
+		self.clfList.append((name, preproc, xgboost.XGBClassifier(**params)))
 
 	def addKNC(self, preproc=None, params={}):
 		name = 'KNC'
-		self.__updateParams(name, params)
-		self.clfList.append((name, preproc, KNeighborsClassifier(**self.__params[name])))
+		self.clfList.append((name, preproc, KNeighborsClassifier(**params)))
 	
 	#def addMLP(self, preproc=None, params={}):
 	#	name = 'MLP'
-	#	self.__params[name].update(params)
-	#	self.clfList.append((name, preproc, KNeighborsClassifier(**self.__params[name])))
+	#	params.update(params)
+	#	self.clfList.append((name, preproc, KNeighborsClassifier(**params)))
 	
 	def addBRBM(self, preproc=None, params={}):
 		name = 'BRBM'
-		self.__updateParams(name, params)
-		self.clfList.append((name, preproc, BernoulliRBM(**self.__params[name])))
+		self.clfList.append((name, preproc, BernoulliRBM(**params)))
 	
 	def addKNN(self, preproc=None, params={}):
 		name = 'KNN'		
-		self.__updateParams(name, params)
 		clf = FixedKerasClassifier(
 			build_fn=buildKeras,
-			nb_epoch=10,
+			nb_epoch=100,
 			#batch_size=5,
 			verbose=1
 		)
@@ -165,16 +159,14 @@ class MetaClassifier(object):
 
 	def addLNN(self, preproc=None, params={}):
 		name = 'LNN'		
-		self.__updateParams(name, params)
 		from nolearn.lasagne import NeuralNet
 		from nolearn.lasagne import TrainSplit
 		from lasagne.layers import DenseLayer
 		from lasagne.layers import InputLayer
 		from lasagne.layers import DropoutLayer
 		from lasagne.updates import adagrad, nesterov_momentum
-		from lasagne.nonlinearities import softmax, sigmoid, softplus
+		from lasagne.nonlinearities import softmax, sigmoid, softplus, tanh
 		from lasagne.objectives import binary_crossentropy
-		
 		import lasagne
 		
 		lasagne.random.set_rng(np.random.RandomState(1))
@@ -185,32 +177,34 @@ class MetaClassifier(object):
 			('dropout0', DropoutLayer),
 			('dense1', DenseLayer),
 			('dropout1', DropoutLayer),
+			('dense2', DenseLayer),
+			('dropout2', DropoutLayer),
 			('output', DenseLayer)
 		]
-		input_shape = self.__params[name]['input_shape']
+		input_shape = params['input_shape']
 		nn = NeuralNet(layers=layers,
 			input_shape=(None, input_shape),
-			dense0_num_units=2000,
-			dropout0_p=0.4,
-			dense1_num_units=1000,
-			dropout1_p=0.4,
-			output_num_units=self.__params[name]['output_shape'],
+			dense0_num_units=1000,
+			dense0_nonlinearity=tanh,
+			dropout0_p=0.5,
+			dense1_num_units=500,
+			dense1_nonlinearity=tanh,
+			dropout1_p=0.3,
+			dense2_num_units=50,
+			dense2_nonlinearity=tanh,
+			dropout2_p=0.1,
+			output_num_units=params['output_shape'],
 			output_nonlinearity=softmax,
 			update=adagrad,
-			update_learning_rate=0.001,
+			update_learning_rate=0.004,
 			#objective = 
-			train_split=TrainSplit(self.__params[name]['train_split']),
+			train_split=TrainSplit(params['train_split']),
 			verbose=1,
-			max_epochs=400
+			max_epochs=40
 		)
 		
 		self.clfList.append((name, preproc, nn))
-
-	def __updateParams(self, name, params):
-		if not params:
-			params = MetaClassifier.getDefaultParams()[name]
-		self.__params[name].update(params)
-		
+	
 
 	def __getFeatureImportance(self):
 		for est in self.__metaClf.estimators_:

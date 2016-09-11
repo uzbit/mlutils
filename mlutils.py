@@ -414,6 +414,13 @@ def get_confusion_rates(label, preds, labels=None):
 	}
 	return ret
 
+def get_auc(clf, X_test, y_test, rate):
+	probs = clf.predict_proba(X_test)[:,1]
+	predictions = get_classification(probs, rate=rate)
+	fpr, tpr, _ = roc_curve(y_test, probs, pos_label=1)
+	thisAUC = auc(fpr, tpr)
+	return thisAUC
+
 def eval_error(preds, dtrain):
 	labels = dtrain.get_label()
 	return 'error', float(sum(labels != (preds > RETURN_ACCEPT_RATE))) / len(labels)

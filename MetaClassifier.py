@@ -18,7 +18,7 @@ import xgboost
 
 def buildKeras():
 	model = Sequential()
-	sgd = SGD(lr=0.01, decay=1e-6, momentum=0.9, nesterov=True)
+	#sgd = SGD(lr=0.01, decay=1e-6, momentum=0.9, nesterov=True)
 	
 	input_shape = 59
 	model.add(Dense(1000,
@@ -29,7 +29,7 @@ def buildKeras():
 	model.add(Dense(500,
 		init='uniform', activation='tanh')
 	)
-	model.add(Dropout(0.1))
+	model.add(Dropout(0.3))
 	model.add(Dense(50,
 		init='uniform', activation='tanh')
 	)
@@ -40,7 +40,7 @@ def buildKeras():
 	# Compile model
 	model.compile(
 		loss='binary_crossentropy',
-		optimizer=sgd, metrics=['accuracy'],
+		optimizer='adagrad', metrics=['accuracy'],
 	)
 	return model
 
@@ -61,7 +61,6 @@ class EnsembleClassifier(BaseEstimator, ClassifierMixin):
 		for name, preproc, est in self.estimators_:
 			if preproc:
 				X = preproc(X)
-			print X
 			est.fit(X, y)
 
 	def predict_proba(self, x):
@@ -75,38 +74,25 @@ class EnsembleClassifier(BaseEstimator, ClassifierMixin):
 
 class MetaClassifier(object):
 
-	def __init__(self, params={}, normalize=False):
+	def __init__(self):
 		self.__metaClf = None
-		self.__params = params
-		#self.__normalize = normalize
-		#self.__normalizer = Normalizer()
+		self.__params = MetaClassifier.getDefaultParams()
 		self.clfList = list()
 		self.feature_importances_ = list()
 	
 	def train(self, X, y):
 		self.__metaClf = EnsembleClassifier(
 			estimators=self.clfList,
-			#voting='soft'
 		)
 		X = X.astype(np.float32)
 		y = y.astype(np.int32)
 		
-		#if self.__normalize:
-		#	X = self.__normalizer.fit_transform(X)
-			
 		self.__metaClf.fit(X, y)
-		#print self.__metaClf.estimators_
-
+		
 	def predict(self, x):
-		#if self.__normalize:
-		#	x = self.__normalizer.transform(x)
 		return self.__metaClf.predict(x)
 	
 	def predict_proba(self, x):
-		#for est in self.__metaClf.estimators_:
-		#	print est
-		#if self.__normalize:
-		#	x = self.__normalizer.transform(x)
 		return self.__metaClf.predict_proba(x)
 	
 	@staticmethod
@@ -122,7 +108,7 @@ class MetaClassifier(object):
 			'KNN': {},
 			'LNN': {
 				'input_shape': 4,
-				'output_num_units': 3,
+				'output_shape': 3,
 				'train_split': 0.3,
 			},
 		}
@@ -132,37 +118,27 @@ class MetaClassifier(object):
 	
 	def addRF(self, preproc=None, params={}):
 		name = 'RF'
-		if not params:
-			params = MetaClassifier.getDefaultParams()[name]
-		self.__params[name].update(params)
+		self.__updateParams(name, params)
 		self.clfList.append((name, preproc, RandomForestClassifier(**self.__params[name])))
 
 	def addLR(self, preproc=None, params={}):
 		name = 'LR'
-		if not params:
-			params = MetaClassifier.getDefaultParams()[name]
-		self.__params[name].update(params)
+		self.__updateParams(name, params)
 		self.clfList.append((name, preproc, LogisticRegression(**self.__params[name])))
 
 	def addGBC(self, preproc=None, params={}):
 		name = 'GBC'
-		if not params:
-			params = MetaClassifier.getDefaultParams()[name]
-		self.__params[name].update(params)
+		self.__updateParams(name, params)
 		self.clfList.append((name, preproc, GradientBoostingClassifier(**self.__params[name])))
 
 	def addXGBC(self, preproc=None, params={}):
 		name = 'XGBC'
-		if not params:
-			params = MetaClassifier.getDefaultParams()[name]
-		self.__params[name].update(params)
+		self.__updateParams(name, params)
 		self.clfList.append((name, preproc, xgboost.XGBClassifier(**self.__params[name])))
 
 	def addKNC(self, preproc=None, params={}):
 		name = 'KNC'
-		if not params:
-			params = MetaClassifier.getDefaultParams()[name]
-		self.__params[name].update(params)
+		self.__updateParams(name, params)
 		self.clfList.append((name, preproc, KNeighborsClassifier(**self.__params[name])))
 	
 	#def addMLP(self, preproc=None, params={}):
@@ -172,16 +148,12 @@ class MetaClassifier(object):
 	
 	def addBRBM(self, preproc=None, params={}):
 		name = 'BRBM'
-		if not params:
-			params = MetaClassifier.getDefaultParams()[name]
-		self.__params[name].update(params)
+		self.__updateParams(name, params)
 		self.clfList.append((name, preproc, BernoulliRBM(**self.__params[name])))
 	
 	def addKNN(self, preproc=None, params={}):
 		name = 'KNN'		
-		if not params:
-			params = MetaClassifier.getDefaultParams()[name]
-		self.__params[name].update(params)
+		self.__updateParams(name, params)
 		clf = FixedKerasClassifier(
 			build_fn=buildKeras,
 			nb_epoch=10,
@@ -193,9 +165,7 @@ class MetaClassifier(object):
 
 	def addLNN(self, preproc=None, params={}):
 		name = 'LNN'		
-		if not params:
-			params = MetaClassifier.getDefaultParams()[name]
-		self.__params[name].update(params)
+		self.__updateParams(name, params)
 		from nolearn.lasagne import NeuralNet
 		from nolearn.lasagne import TrainSplit
 		from lasagne.layers import DenseLayer
@@ -204,7 +174,6 @@ class MetaClassifier(object):
 		from lasagne.updates import adagrad, nesterov_momentum
 		from lasagne.nonlinearities import softmax, sigmoid, softplus
 		from lasagne.objectives import binary_crossentropy
-		from sklearn.pipeline import Pipeline
 		
 		import lasagne
 		
@@ -216,46 +185,32 @@ class MetaClassifier(object):
 			('dropout0', DropoutLayer),
 			('dense1', DenseLayer),
 			('dropout1', DropoutLayer),
-			('dense2', DenseLayer),
-			('dropout2', DropoutLayer),
-			('dense3', DenseLayer),
-			('dropout3', DropoutLayer),
-			('dense4', DenseLayer),
-			('dropout4', DropoutLayer),
-			#('dense5', DenseLayer),
-			#('dropout1', DropoutLayer),
 			('output', DenseLayer)
 		]
 		input_shape = self.__params[name]['input_shape']
 		nn = NeuralNet(layers=layers,
 			input_shape=(None, input_shape),
-			dense0_num_units=input_shape*2,
+			dense0_num_units=2000,
 			dropout0_p=0.4,
-			#dense0_nonlinearity=softmax,
-			dense1_num_units=input_shape*2,
+			dense1_num_units=1000,
 			dropout1_p=0.4,
-			dense2_num_units=input_shape*2,
-			dropout2_p=0.4,
-			dense3_num_units=input_shape*2,
-			dropout3_p=0.4,
-			dense4_num_units=input_shape*2,
-			dropout4_p=0.4,
-			output_num_units=2, #self.__params[name].update(params)['output_num_units'],
+			output_num_units=self.__params[name]['output_shape'],
 			output_nonlinearity=softmax,
-			update=nesterov_momentum,
+			update=adagrad,
 			update_learning_rate=0.001,
-			update_momentum=0.9,
-			#objective_loss_function=lasagne.objectives.binary_crossentropy,
-			regression=False,
-			train_split=TrainSplit(eval_size=self.__params[name]['train_split']),
+			#objective = 
+			train_split=TrainSplit(self.__params[name]['train_split']),
 			verbose=1,
-			max_epochs=500
+			max_epochs=400
 		)
-		pipeline = Pipeline([
-			('nn', nn),
-		])
 		
-		self.clfList.append((name, preproc, pipeline))
+		self.clfList.append((name, preproc, nn))
+
+	def __updateParams(self, name, params):
+		if not params:
+			params = MetaClassifier.getDefaultParams()[name]
+		self.__params[name].update(params)
+		
 
 	def __getFeatureImportance(self):
 		for est in self.__metaClf.estimators_:

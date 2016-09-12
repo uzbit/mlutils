@@ -227,37 +227,38 @@ def do_nn_hyperopt_search(X, y, cv=3, testSize=0.2, seed=42):
 	from hyperopt import fmin, tpe, hp, STATUS_OK, Trials
 
 	print "Performing hyperopt search..."
-	intChoices = {
-		'input_shape': np.array([59]),
-		'output_shape': np.array([2]),
-		'dense0_num_units': np.arange(500, 5000, dtype=int),
-		'dense1_num_units': np.arange(50, 500, dtype=int),
-		'dense2_num_units': np.arange(10, 50, dtype=int),
-		'max_epochs': np.arange(20, 100, dtype=int),
-		#'dense3_num_units': np.arange(50, 5000, dtype=int),
-	}
+	
+	intParams = [
+		'dense0_num_units',
+		'dense1_num_units',
+		'dense2_num_units',
+		'max_epochs',
+	]
+	
 	space = {
-		'dense0_num_units' : hp.choice('dense0_num_units', intChoices['dense0_num_units']),
-		'dense1_num_units' : hp.choice('dense1_num_units', intChoices['dense1_num_units']),
-		'dense2_num_units' : hp.choice('dense2_num_units', intChoices['dense2_num_units']),
-		'update_learning_rate' : hp.uniform('update_learning_rate', 0.0001, 0.1),
-		'dropout0_p' : hp.uniform('dropout0_p', 0.2, 0.5),
-		'dropout1_p' : hp.uniform('dropout1_p', 0.2, 0.5),
-		'dropout2_p' : hp.uniform('dropout2_p', 0.2, 0.5),
-		'max_epochs' : hp.choice('max_epochs', intChoices['max_epochs']),
-		'input_shape' : hp.choice('input_shape', intChoices['input_shape']),
-		'output_shape' : hp.choice('output_shape', intChoices['output_shape']),
+		'dense0_num_units' : hp.qloguniform('dense0_num_units', np.log(1e3), np.log(1e4), 1), #hp.choice('dense0_num_units', intChoices['dense0_num_units']),
+		'dense1_num_units' : hp.qloguniform('dense1_num_units', np.log(1e2), np.log(1e3), 1), #hp.choice('dense1_num_units', intChoices['dense1_num_units']),
+		'dense2_num_units' : hp.qloguniform('dense2_num_units', np.log(1e1), np.log(1e2), 1), #hp.choice('dense2_num_units', intChoices['dense2_num_units']),
+		'update_learning_rate' : hp.loguniform('update_learning_rate', np.log(1e-4), np.log(1e-1)),
+		'dropout0_p' : hp.uniform('dropout0_p', 0.1, 0.5),
+		'dropout1_p' : hp.uniform('dropout1_p', 0.1, 0.5),
+		'dropout2_p' : hp.uniform('dropout2_p', 0.1, 0.5),
+		'max_epochs' : hp.qloguniform('max_epochs', np.log(5e1), np.log(5e2), 1), #hp.choice('max_epochs', intChoices['max_epochs']),
 		'train_split' : hp.uniform('train_split', 0.199999, 0.2),
 	}
 
-	
 	def score(params):
 		results = list()
 		print "Testing for ", params
 		lcStandardScaler = StandardScaler()
 		def scalePreproc(X):
 			return lcStandardScaler.transform(X)
-	
+		
+		params['input_shape'] = X.shape[1]
+		params['output_shape'] = 2
+		for param in intParams:
+			params[param] = int(params[param])
+		
 		for i in xrange(cv):
 			X_train, X_test, y_train, y_test = train_test_split(
 				X, y, test_size=testSize, stratify=y, random_state=seed+i
@@ -283,12 +284,12 @@ def do_nn_hyperopt_search(X, y, cv=3, testSize=0.2, seed=42):
 	bestParams = fmin(score, space,
 		algo=tpe.suggest,
 		trials=trials,
-		max_evals=50,
+		max_evals=2,
 		#rseed=None
 	)
-	for intChoice in intChoices:
-		bestParams[intChoice] = intChoices[intChoice][bestParams[intChoice]]
-
+	for param in intParams:
+		bestParams[param] = int(bestParams[param])
+		
 	print "Saving the best parameters: ", bestParams
 
 	pickle.dump(bestParams, open('bestParams_nn.pickle', 'wb'))

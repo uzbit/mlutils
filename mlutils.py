@@ -1,21 +1,18 @@
 import os
+import random
 import numpy as np
 import matplotlib.pyplot as plt
 import cPickle as pickle
 import xgboost as xgb
-import datetime
-import random
 
-from sklearn import preprocessing
-from sklearn.decomposition import PCA
+from sklearn.preprocessing import StandardScaler, LabelEncoder
 from sklearn.metrics import confusion_matrix,  matthews_corrcoef, make_scorer, roc_curve, auc
 from sklearn.cross_validation import train_test_split
 from bayes_opt.bayesian_optimization import BayesianOptimization
 
-LOGIT_ACCEPT_RATE = 0.95
+from MetaClassifier import MetaClassifier
 
-def get_sanitized(loan, key, default=0):
-	return loan[key] if key in loan and loan[key] is not None else default
+LOGIT_ACCEPT_RATE = 0.95
 
 def plot_hist(y1, y2 = None, binFactor=50.0, title=''):
 	thisMax = max(y1)
@@ -27,9 +24,6 @@ def plot_hist(y1, y2 = None, binFactor=50.0, title=''):
 		thisMin = min(thisMin, min2)
 
 	thisWidth = (thisMax - thisMin)/binFactor
-	#plt.hist(y, bins=numpy.arange(5, 25, 20/binFactor))
-	#axes = plt.gca()
-	#axes.set_ylim(0,3500)
 	try:
 		plt.hist(y1, alpha = 0.5, bins=np.arange(thisMin, thisMax + thisWidth,  thisWidth), label='y1')
 		if y2 is not None:
@@ -82,7 +76,7 @@ def get_classification(y, rate=0.5):
 	return np.array([1 if x else 0 for x in y >= rate])
 
 def get_labelencoder(column_values):
-	le = preprocessing.LabelEncoder()
+	le = LabelEncoder()
 	le.fit(column_values)
 	return le
 
@@ -102,17 +96,6 @@ def get_remove_features(df, featureColumns, N=5):
 
 def transform_column(le, df, column):
 	df[column] = le.transform(df[column])
-
-def scorer_MCC(labels, preds):
-	preds = get_classification(preds)
-	coeff = matthews_corrcoef(labels, preds)
-	return coeff
-
-def eval_MCC(preds, dtrain):
-	labels = dtrain.get_label()
-	preds = get_classification(preds)
-	coeff = matthews_corrcoef(labels, preds)
-	return 'MCC', coeff
 
 def do_evo_search(X, y,
 	grid={}, scorer=None, cv=3,
@@ -236,6 +219,80 @@ def do_hyperopt_search(X, y, cv=3, testSize=0.2, seed=42):
 	pickle.dump(bestParams, open('bestParams.pickle', 'wb'))
 	return bestParams
 
+def do_nn_hyperopt_search(X, y, cv=3, testSize=0.2, seed=42):
+	#if os.path.exists('bestParams.pickle'):
+	#	return pickle.load(open('bestParams.pickle', 'rb'))
+
+	from hyperopt import hp
+	from hyperopt import fmin, tpe, hp, STATUS_OK, Trials
+
+	print "Performing hyperopt search..."
+	intChoices = {
+		'input_shape': np.array([59]),
+		'output_shape': np.array([2]),
+		'dense0_num_units': np.arange(500, 5000, dtype=int),
+		'dense1_num_units': np.arange(50, 500, dtype=int),
+		'dense2_num_units': np.arange(10, 50, dtype=int),
+		'max_epochs': np.arange(20, 100, dtype=int),
+		#'dense3_num_units': np.arange(50, 5000, dtype=int),
+	}
+	space = {
+		'dense0_num_units' : hp.choice('dense0_num_units', intChoices['dense0_num_units']),
+		'dense1_num_units' : hp.choice('dense1_num_units', intChoices['dense1_num_units']),
+		'dense2_num_units' : hp.choice('dense2_num_units', intChoices['dense2_num_units']),
+		'update_learning_rate' : hp.uniform('update_learning_rate', 0.0001, 0.1),
+		'dropout0_p' : hp.uniform('dropout0_p', 0.2, 0.5),
+		'dropout1_p' : hp.uniform('dropout1_p', 0.2, 0.5),
+		'dropout2_p' : hp.uniform('dropout2_p', 0.2, 0.5),
+		'max_epochs' : hp.choice('max_epochs', intChoices['max_epochs']),
+		'input_shape' : hp.choice('input_shape', intChoices['input_shape']),
+		'output_shape' : hp.choice('output_shape', intChoices['output_shape']),
+		'train_split' : hp.uniform('train_split', 0.199999, 0.2),
+	}
+
+	
+	def score(params):
+		results = list()
+		print "Testing for ", params
+		lcStandardScaler = StandardScaler()
+		def scalePreproc(X):
+			return lcStandardScaler.transform(X)
+	
+		for i in xrange(cv):
+			X_train, X_test, y_train, y_test = train_test_split(
+				X, y, test_size=testSize, stratify=y, random_state=seed+i
+			)
+			print "Train shape", X_train.shape
+			lcStandardScaler.fit(X_train)
+			mcObj = MetaClassifier()
+			mcObj.addLNN(
+				preproc=scalePreproc,
+				params=params
+			)
+			mcObj.train(X_train, y_train)
+			probs = mcObj.predict_proba(X_test)[:,1]
+			fpr, tpr, _ = roc_curve(y_test, probs, pos_label=1)
+			results.append(auc(fpr, tpr))
+
+		print "Outcomes: ", results
+		print "This score:", 1.0-np.mean(results)
+		print
+		return {'loss': 1.0-np.mean(results), 'status': STATUS_OK}
+
+	trials = Trials()
+	bestParams = fmin(score, space,
+		algo=tpe.suggest,
+		trials=trials,
+		max_evals=50,
+		#rseed=None
+	)
+	for intChoice in intChoices:
+		bestParams[intChoice] = intChoices[intChoice][bestParams[intChoice]]
+
+	print "Saving the best parameters: ", bestParams
+
+	pickle.dump(bestParams, open('bestParams_nn.pickle', 'wb'))
+	return bestParams
 
 def do_bayes_search(X, y, cv=3, testSize=0.3):
 	if os.path.exists('bestParams.pickle'):
@@ -421,15 +478,6 @@ def get_auc(clf, X_test, y_test, rate):
 	thisAUC = auc(fpr, tpr)
 	return thisAUC
 
-def eval_error(preds, dtrain):
-	labels = dtrain.get_label()
-	return 'error', float(sum(labels != (preds > RETURN_ACCEPT_RATE))) / len(labels)
-
-def scorer_MCC(labels, preds):
-	preds = get_classification(preds, rate=LOGIT_ACCEPT_RATE)
-	coeff = matthews_corrcoef(labels, preds)
-	return coeff
-
 def scorer_auc(labels, preds):
 	fpr, tpr, _ = roc_curve(labels, preds, pos_label=1)
 	score = auc(fpr, tpr)
@@ -441,7 +489,16 @@ def eval_auc(preds, dtrain):
 	score = auc(fpr, tpr)
 	return 'auc', score
 
-def eval_MCC(preds, dtrain):
+def eval_error(preds, dtrain):
+	labels = dtrain.get_label()
+	return 'error', float(sum(labels != (preds > RETURN_ACCEPT_RATE))) / len(labels)
+
+def scorer_mcc(labels, preds):
+	preds = get_classification(preds, rate=LOGIT_ACCEPT_RATE)
+	coeff = matthews_corrcoef(labels, preds)
+	return coeff
+
+def eval_mcc(preds, dtrain):
 	labels = dtrain.get_label()
 	preds = get_classification(preds, rate=LOGIT_ACCEPT_RATE)
 	coeff = matthews_corrcoef(labels, preds)

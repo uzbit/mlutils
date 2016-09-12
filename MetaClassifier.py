@@ -108,9 +108,17 @@ class MetaClassifier(object):
 			'BRBM': {'random_state': 42},
 			'KNN': {},
 			'LNN': {
-				'input_shape': 4,
-				'output_shape': 3,
-				'train_split': 0.3,
+				'dense0_num_units' : 1000,
+				'dense1_num_units' : 500,
+				'dense2_num_units' : 50,
+				'dropout0_p' : 0.4,
+				'dropout1_p' : 0.4,
+				'dropout2_p' : 0.4,
+				'max_epochs' : 40,
+				'input_shape' : 59,
+				'output_shape' : 2,
+				'update_learning_rate' : 0.001,
+				'train_split' : 0.2,
 			},
 		}
 
@@ -150,7 +158,7 @@ class MetaClassifier(object):
 		name = 'KNN'		
 		clf = FixedKerasClassifier(
 			build_fn=buildKeras,
-			nb_epoch=100,
+			nb_epoch=10,
 			#batch_size=5,
 			verbose=1
 		)
@@ -169,7 +177,7 @@ class MetaClassifier(object):
 		from lasagne.objectives import binary_crossentropy
 		import lasagne
 		
-		lasagne.random.set_rng(np.random.RandomState(1))
+		#lasagne.random.set_rng(np.random.RandomState(1))
 		
 		layers = [
 			('input', InputLayer),
@@ -184,23 +192,23 @@ class MetaClassifier(object):
 		input_shape = params['input_shape']
 		nn = NeuralNet(layers=layers,
 			input_shape=(None, input_shape),
-			dense0_num_units=1000,
+			dense0_num_units=params['dense0_num_units'],
 			dense0_nonlinearity=tanh,
-			dropout0_p=0.5,
-			dense1_num_units=500,
+			dropout0_p=params['dropout0_p'],
+			dense1_num_units=params['dense1_num_units'],
 			dense1_nonlinearity=tanh,
-			dropout1_p=0.3,
-			dense2_num_units=50,
+			dropout1_p=params['dropout1_p'],
+			dense2_num_units=params['dense2_num_units'],
 			dense2_nonlinearity=tanh,
-			dropout2_p=0.1,
+			dropout2_p=params['dropout2_p'],
 			output_num_units=params['output_shape'],
 			output_nonlinearity=softmax,
 			update=adagrad,
-			update_learning_rate=0.004,
+			update_learning_rate=params['update_learning_rate'],
 			#objective = 
 			train_split=TrainSplit(params['train_split']),
 			verbose=1,
-			max_epochs=40
+			max_epochs=params['max_epochs']
 		)
 		
 		self.clfList.append((name, preproc, nn))

@@ -219,7 +219,7 @@ def do_hyperopt_search(X, y, cv=3, testSize=0.2, seed=42):
 	pickle.dump(bestParams, open('bestParams.pickle', 'wb'))
 	return bestParams
 
-def do_nn_hyperopt_search(X, y, cv=3, testSize=0.2, seed=42):
+def do_lnn_hyperopt_search(X, y, cv=3, testSize=0.2, seed=42):
 	#if os.path.exists('bestParams.pickle'):
 	#	return pickle.load(open('bestParams.pickle', 'rb'))
 
@@ -243,7 +243,7 @@ def do_nn_hyperopt_search(X, y, cv=3, testSize=0.2, seed=42):
 		'dropout0_p' : hp.uniform('dropout0_p', 0.1, 0.5),
 		'dropout1_p' : hp.uniform('dropout1_p', 0.1, 0.5),
 		'dropout2_p' : hp.uniform('dropout2_p', 0.1, 0.5),
-		'max_epochs' : hp.qloguniform('max_epochs', np.log(5e1), np.log(5e2), 1), #hp.choice('max_epochs', intChoices['max_epochs']),
+		'max_epochs' : hp.qloguniform('max_epochs', np.log(5e1), np.log(1e2), 1), #hp.choice('max_epochs', intChoices['max_epochs']),
 		'train_split' : hp.uniform('train_split', 0.199999, 0.2),
 	}
 
@@ -284,7 +284,7 @@ def do_nn_hyperopt_search(X, y, cv=3, testSize=0.2, seed=42):
 	bestParams = fmin(score, space,
 		algo=tpe.suggest,
 		trials=trials,
-		max_evals=2,
+		max_evals=100,
 		#rseed=None
 	)
 	for param in intParams:
@@ -292,7 +292,7 @@ def do_nn_hyperopt_search(X, y, cv=3, testSize=0.2, seed=42):
 		
 	print "Saving the best parameters: ", bestParams
 
-	pickle.dump(bestParams, open('bestParams_nn.pickle', 'wb'))
+	pickle.dump(bestParams, open('bestParams_lnn.pickle', 'wb'))
 	return bestParams
 
 def do_bayes_search(X, y, cv=3, testSize=0.3):
@@ -472,9 +472,8 @@ def get_confusion_rates(label, preds, labels=None):
 	}
 	return ret
 
-def get_auc(clf, X_test, y_test, rate):
+def get_auc(clf, X_test, y_test):
 	probs = clf.predict_proba(X_test)[:,1]
-	predictions = get_classification(probs, rate=rate)
 	fpr, tpr, _ = roc_curve(y_test, probs, pos_label=1)
 	thisAUC = auc(fpr, tpr)
 	return thisAUC

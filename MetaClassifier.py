@@ -22,19 +22,19 @@ def buildKeras():
 	#sgd = SGD(lr=0.01, decay=1e-6, momentum=0.9, nesterov=True)
 	
 	input_shape = 59
-	model.add(Dense(1000,
+	model.add(Dense(1874,
 		input_dim=input_shape,
 		init='uniform', activation='tanh')
 	)
-	model.add(Dropout(0.5))
-	model.add(Dense(500,
+	model.add(Dropout(0.33))
+	model.add(Dense(332,
 		init='uniform', activation='tanh')
 	)
-	model.add(Dropout(0.3))
-	model.add(Dense(50,
+	model.add(Dropout(0.1375))
+	model.add(Dense(44,
 		init='uniform', activation='tanh')
 	)
-	model.add(Dropout(0.1))
+	model.add(Dropout(0.298))
 	model.add(Dense(1,
 		init='uniform', activation='sigmoid')
 	)
@@ -55,36 +55,29 @@ class FixedKerasClassifier(KerasClassifier):
 
 
 class EnsembleClassifier(BaseEstimator, ClassifierMixin):
-	def __init__(self, estimators=None):
+	def __init__(self, estimators=list()):
 		self.estimators_ = estimators
-
+		self.predictions_ = list()
+		
 	def fit(self, X, y):
 		for name, preproc, est in self.estimators_:
-			if preproc:
-				X = preproc(X)
-			est.fit(X, y)
+			est.fit(MetaClassifier.applyPreproc(preproc, X), y)
 
 	def predict_proba(self, x):
 		self.predictions_ = list()
 		for name, preproc, est in self.estimators_:
-			if preproc:
-				x = preproc(x)
-			
-			self.predictions_.append(est.predict_proba(x))
+			self.predictions_.append(
+				est.predict_proba(MetaClassifier.applyPreproc(preproc, x))
+			)
 		return np.mean(self.predictions_, axis=0)
 
 class MetaClassifier(object):
 
 	def __init__(self):
-		self.__metaClf = None
-		#self.__params = MetaClassifier.getDefaultParams()
-		self.clfList = list()
+		self.__metaClf = EnsembleClassifier()
 		self.feature_importances_ = list()
 	
 	def train(self, X, y):
-		self.__metaClf = EnsembleClassifier(
-			estimators=self.clfList,
-		)
 		X = X.astype(np.float32)
 		y = y.astype(np.int32)
 		
@@ -96,6 +89,17 @@ class MetaClassifier(object):
 	def predict_proba(self, x):
 		return self.__metaClf.predict_proba(x)
 	
+	def getClassifierList(self):
+		return self.__metaClf.estimators_
+	
+	@staticmethod
+	def applyPreproc(preproc, x):
+		if preproc:
+			x_ = np.copy(x)
+			return preproc(x_)
+		else:
+			return x
+			
 	@staticmethod
 	def getDefaultParams():
 		return {
@@ -127,43 +131,43 @@ class MetaClassifier(object):
 	
 	def addRF(self, preproc=None, params={}):
 		name = 'RF'
-		self.clfList.append((name, preproc, RandomForestClassifier(**params)))
+		self.getClassifierList().append((name, preproc, RandomForestClassifier(**params)))
 
 	def addLR(self, preproc=None, params={}):
 		name = 'LR'
-		self.clfList.append((name, preproc, LogisticRegression(**params)))
+		self.getClassifierList().append((name, preproc, LogisticRegression(**params)))
 
 	def addGBC(self, preproc=None, params={}):
 		name = 'GBC'
-		self.clfList.append((name, preproc, GradientBoostingClassifier(**params)))
+		self.getClassifierList().append((name, preproc, GradientBoostingClassifier(**params)))
 
 	def addXGBC(self, preproc=None, params={}):
 		name = 'XGBC'
-		self.clfList.append((name, preproc, xgboost.XGBClassifier(**params)))
+		self.getClassifierList().append((name, preproc, xgboost.XGBClassifier(**params)))
 
 	def addKNC(self, preproc=None, params={}):
 		name = 'KNC'
-		self.clfList.append((name, preproc, KNeighborsClassifier(**params)))
+		self.getClassifierList().append((name, preproc, KNeighborsClassifier(**params)))
 	
 	#def addMLP(self, preproc=None, params={}):
 	#	name = 'MLP'
 	#	params.update(params)
-	#	self.clfList.append((name, preproc, KNeighborsClassifier(**params)))
+	#	self.getClassifierList().append((name, preproc, KNeighborsClassifier(**params)))
 	
 	def addBRBM(self, preproc=None, params={}):
 		name = 'BRBM'
-		self.clfList.append((name, preproc, BernoulliRBM(**params)))
+		self.getClassifierList().append((name, preproc, BernoulliRBM(**params)))
 	
 	def addKNN(self, preproc=None, params={}):
 		name = 'KNN'		
 		clf = FixedKerasClassifier(
 			build_fn=buildKeras,
-			nb_epoch=10,
-			#batch_size=5,
-			verbose=1
+			nb_epoch=85,
+			batch_size=5,
+			verbose=0
 		)
 		
-		self.clfList.append((name, preproc, clf))
+		self.getClassifierList().append((name, preproc, clf))
 
 	def addLNN(self, preproc=None, params={}):
 		name = 'LNN'		
@@ -177,7 +181,7 @@ class MetaClassifier(object):
 		from lasagne.objectives import binary_crossentropy
 		import lasagne
 		
-		#lasagne.random.set_rng(np.random.RandomState(1))
+		lasagne.random.set_rng(np.random.RandomState(1))
 		
 		layers = [
 			('input', InputLayer),
@@ -211,7 +215,7 @@ class MetaClassifier(object):
 			max_epochs=params['max_epochs']
 		)
 		
-		self.clfList.append((name, preproc, nn))
+		self.getClassifierList().append((name, preproc, nn))
 	
 
 	def __getFeatureImportance(self):

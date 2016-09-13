@@ -319,7 +319,7 @@ def do_knn_hyperopt_search(X, y, cv=3, testSize=0.2, seed=42):
 		'dropout0_p' : hp.uniform('dropout0_p', 0.1, 0.5),
 		'dropout1_p' : hp.uniform('dropout1_p', 0.1, 0.5),
 		'dropout2_p' : hp.uniform('dropout2_p', 0.1, 0.5),
-		'nb_epoch' : hp.qloguniform('nb_epoch', np.log(1e1), np.log(1.1e1), 1), #hp.choice('max_epochs', intChoices['max_epochs']),
+		'nb_epoch' : hp.qloguniform('nb_epoch', np.log(5e1), np.log(1e2), 1), #hp.choice('max_epochs', intChoices['max_epochs']),
 	}
 
 	def score(params):
@@ -385,7 +385,7 @@ def do_knn_hyperopt_search(X, y, cv=3, testSize=0.2, seed=42):
 	bestParams = fmin(score, space,
 		algo=tpe.suggest,
 		trials=trials,
-		max_evals=2,
+		max_evals=100,
 	)
 	for param in intParams:
 		bestParams[param] = int(bestParams[param])

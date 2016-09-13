@@ -269,7 +269,7 @@ def do_lnn_hyperopt_search(X, y, cv=3, testSize=0.2, seed=42):
 				params=params
 			)
 			mcObj.train(X_train, y_train)
-			results.append(get_auc(mcObj, scalePreproc(X_test), y_test))
+			results.append(get_auc(mcObj, X_test, y_test))
 
 		print "Outcomes: ", results
 		print "This score:", 1.0-np.mean(results)
@@ -374,7 +374,7 @@ def do_knn_hyperopt_search(X, y, cv=3, testSize=0.2, seed=42):
 				params={'build_fn': build_fn, 'nb_epoch': params['nb_epoch']}
 			)
 			mcObj.train(X_train, y_train)
-			results.append(get_auc(mcObj, scalePreproc(X_test), y_test))
+			results.append(get_auc(mcObj, X_test, y_test))
 
 		print "Outcomes: ", results
 		print "This score:", 1.0-np.mean(results)

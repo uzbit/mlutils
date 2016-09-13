@@ -248,9 +248,9 @@ def do_lnn_hyperopt_search(X, y, cv=3, testSize=0.2, seed=42):
 	def score(params):
 		results = list()
 		print "Testing for ", params
-		lcStandardScaler = StandardScaler()
+		standardScaler = StandardScaler()
 		def scalePreproc(X):
-			return lcStandardScaler.transform(X)
+			return standardScaler.transform(X)
 		
 		params['input_shape'] = X.shape[1]
 		params['output_shape'] = 2
@@ -262,14 +262,14 @@ def do_lnn_hyperopt_search(X, y, cv=3, testSize=0.2, seed=42):
 				X, y, test_size=testSize, stratify=y, random_state=seed+i
 			)
 			print "Train shape", X_train.shape
-			lcStandardScaler.fit(X_train)
+			standardScaler.fit(X_train)
 			mcObj = MetaClassifier()
 			mcObj.addLNN(
 				preproc=scalePreproc,
 				params=params
 			)
 			mcObj.train(X_train, y_train)
-			results.append(get_auc(mcObj, X_test_, y_test))
+			results.append(get_auc(mcObj, scalePreproc(X_test), y_test))
 
 		print "Outcomes: ", results
 		print "This score:", 1.0-np.mean(results)
@@ -325,9 +325,9 @@ def do_knn_hyperopt_search(X, y, cv=3, testSize=0.2, seed=42):
 	def score(params):
 		results = list()
 		print "Testing for ", params
-		lcStandardScaler = StandardScaler()
+		standardScaler = StandardScaler()
 		def scalePreproc(X):
-			return lcStandardScaler.transform(X)
+			return standardScaler.transform(X)
 		
 		def build_fn():
 			model = Sequential()
@@ -367,14 +367,14 @@ def do_knn_hyperopt_search(X, y, cv=3, testSize=0.2, seed=42):
 				X, y, test_size=testSize, stratify=y, random_state=seed+i
 			)
 			print "Train shape", X_train.shape
-			lcStandardScaler.fit(X_train)
+			standardScaler.fit(X_train)
 			mcObj = MetaClassifier()
 			mcObj.addKNN(
 				preproc=scalePreproc,
 				params={'build_fn': build_fn, 'nb_epoch': params['nb_epoch']}
 			)
 			mcObj.train(X_train, y_train)
-			results.append(get_auc(mcObj, X_test_, y_test))
+			results.append(get_auc(mcObj, scalePreproc(X_test), y_test))
 
 		print "Outcomes: ", results
 		print "This score:", 1.0-np.mean(results)

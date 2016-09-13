@@ -220,13 +220,11 @@ def do_hyperopt_search(X, y, cv=3, testSize=0.2, seed=42):
 	return bestParams
 
 def do_lnn_hyperopt_search(X, y, cv=3, testSize=0.2, seed=42):
-	#if os.path.exists('bestParams.pickle'):
-	#	return pickle.load(open('bestParams.pickle', 'rb'))
-
+	
 	from hyperopt import hp
 	from hyperopt import fmin, tpe, hp, STATUS_OK, Trials
 
-	print "Performing hyperopt search..."
+	print "Performing LNN hyperopt search..."
 	
 	intParams = [
 		'dense0_num_units',
@@ -271,9 +269,7 @@ def do_lnn_hyperopt_search(X, y, cv=3, testSize=0.2, seed=42):
 				params=params
 			)
 			mcObj.train(X_train, y_train)
-			probs = mcObj.predict_proba(X_test)[:,1]
-			fpr, tpr, _ = roc_curve(y_test, probs, pos_label=1)
-			results.append(auc(fpr, tpr))
+			results.append(get_auc(mcObj, X_test_, y_test))
 
 		print "Outcomes: ", results
 		print "This score:", 1.0-np.mean(results)
@@ -293,6 +289,110 @@ def do_lnn_hyperopt_search(X, y, cv=3, testSize=0.2, seed=42):
 	print "Saving the best parameters: ", bestParams
 
 	pickle.dump(bestParams, open('bestParams_lnn.pickle', 'wb'))
+	return bestParams
+
+
+def do_knn_hyperopt_search(X, y, cv=3, testSize=0.2, seed=42):
+	
+	from hyperopt import hp
+	from hyperopt import fmin, tpe, hp, STATUS_OK, Trials
+	from keras.wrappers.scikit_learn import KerasClassifier
+	from keras.models import Sequential
+	from keras.layers import Dense, Dropout
+	from keras.layers.local import LocallyConnected1D
+	from keras.optimizers import SGD
+
+	print "Performing KNN hyperopt search..."
+	
+	intParams = [
+		'dense0_num_units',
+		'dense1_num_units',
+		'dense2_num_units',
+		'nb_epoch',
+	]
+	
+	space = {
+		'dense0_num_units' : hp.qloguniform('dense0_num_units', np.log(1e3), np.log(1e4), 1), #hp.choice('dense0_num_units', intChoices['dense0_num_units']),
+		'dense1_num_units' : hp.qloguniform('dense1_num_units', np.log(1e2), np.log(1e3), 1), #hp.choice('dense1_num_units', intChoices['dense1_num_units']),
+		'dense2_num_units' : hp.qloguniform('dense2_num_units', np.log(1e1), np.log(1e2), 1), #hp.choice('dense2_num_units', intChoices['dense2_num_units']),
+		'update_learning_rate' : hp.loguniform('update_learning_rate', np.log(1e-4), np.log(1e-1)),
+		'dropout0_p' : hp.uniform('dropout0_p', 0.1, 0.5),
+		'dropout1_p' : hp.uniform('dropout1_p', 0.1, 0.5),
+		'dropout2_p' : hp.uniform('dropout2_p', 0.1, 0.5),
+		'nb_epoch' : hp.qloguniform('nb_epoch', np.log(5e1), np.log(1e2), 1), #hp.choice('max_epochs', intChoices['max_epochs']),
+	}
+
+	def score(params):
+		results = list()
+		print "Testing for ", params
+		lcStandardScaler = StandardScaler()
+		def scalePreproc(X):
+			return lcStandardScaler.transform(X)
+		
+		def build_fn():
+			model = Sequential()
+			sgd = SGD(lr=params['update_learning_rate'], decay=1e-6, momentum=0.9, nesterov=True)
+			
+			model.add(Dense(params['dense0_num_units'],
+				input_dim=params['input_shape'] ,
+				init='uniform', activation='tanh')
+			)
+			model.add(Dropout(params['dropout0_p']))
+			model.add(Dense(params['dense1_num_units'],
+				init='uniform', activation='tanh')
+			)
+			model.add(Dropout(params['dropout1_p']))
+			model.add(Dense(params['dense2_num_units'],
+				init='uniform', activation='tanh')
+			)
+			model.add(Dropout(params['dropout2_p']))
+			model.add(Dense(params['output_shape'],
+				init='uniform', activation='sigmoid')
+			)
+			# Compile model
+			model.compile(
+				loss='binary_crossentropy',
+				optimizer='adagrad', metrics=['accuracy'],
+			)
+			return model
+		
+		params['input_shape'] = X.shape[1]
+		params['output_shape'] = 1
+		
+		for param in intParams:
+			params[param] = int(params[param])
+		
+		for i in xrange(cv):
+			X_train, X_test, y_train, y_test = train_test_split(
+				X, y, test_size=testSize, stratify=y, random_state=seed+i
+			)
+			print "Train shape", X_train.shape
+			lcStandardScaler.fit(X_train)
+			mcObj = MetaClassifier()
+			mcObj.addKNN(
+				preproc=scalePreproc,
+				params={'build_fn': build_fn, 'nb_epoch': params['nb_epoch']}
+			)
+			mcObj.train(X_train, y_train)
+			results.append(get_auc(mcObj, X_test_, y_test))
+
+		print "Outcomes: ", results
+		print "This score:", 1.0-np.mean(results)
+		print
+		return {'loss': 1.0-np.mean(results), 'status': STATUS_OK}
+
+	trials = Trials()
+	bestParams = fmin(score, space,
+		algo=tpe.suggest,
+		trials=trials,
+		max_evals=2,
+	)
+	for param in intParams:
+		bestParams[param] = int(bestParams[param])
+		
+	print "Saving the best parameters: ", bestParams
+
+	pickle.dump(bestParams, open('bestParams_knn.pickle', 'wb'))
 	return bestParams
 
 def do_bayes_search(X, y, cv=3, testSize=0.3):

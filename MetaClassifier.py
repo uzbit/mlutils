@@ -19,7 +19,7 @@ np.random.seed(42)
 
 def buildKeras():
 	model = Sequential()
-	#sgd = SGD(lr=0.01, decay=1e-6, momentum=0.9, nesterov=True)
+	sgd = SGD(lr=0.01, decay=1e-6, momentum=0.9, nesterov=True)
 	
 	input_shape = 59
 	model.add(Dense(1874,
@@ -159,12 +159,13 @@ class MetaClassifier(object):
 		self.getClassifierList().append((name, preproc, BernoulliRBM(**params)))
 	
 	def addKNN(self, preproc=None, params={}):
-		name = 'KNN'		
+		name = 'KNN'
+		
 		clf = FixedKerasClassifier(
-			build_fn=buildKeras,
-			nb_epoch=85,
-			batch_size=5,
-			verbose=0
+			build_fn=params['build_fn'],
+			nb_epoch=params['nb_epoch'],
+			#batch_size=params['batch_size'],
+			verbose=1
 		)
 		
 		self.getClassifierList().append((name, preproc, clf))

@@ -1,49 +1,19 @@
+import numpy as np
 
-#from sklearn.ensemble import VotingClassifier
+from sknn.platform import gpu32
 from sklearn.linear_model import LogisticRegression
 from sklearn.neighbors import KNeighborsClassifier
 from sklearn.ensemble import RandomForestClassifier
 from sklearn.ensemble import GradientBoostingClassifier
 from sklearn.base import BaseEstimator, ClassifierMixin
 from sklearn.neural_network import BernoulliRBM
-from sknn.platform import gpu32
+from sklearn.preprocessing import normalize
 from keras.wrappers.scikit_learn import KerasClassifier
 from keras.models import Sequential
-from keras.layers import Dense, Dropout
-from keras.layers.local import LocallyConnected1D
-from keras.optimizers import SGD
 
-import numpy as np
 import xgboost
-np.random.seed(42)
 
-def buildKeras():
-	model = Sequential()
-	sgd = SGD(lr=0.01, decay=1e-6, momentum=0.9, nesterov=True)
-	
-	input_shape = 59
-	model.add(Dense(1874,
-		input_dim=input_shape,
-		init='uniform', activation='tanh')
-	)
-	model.add(Dropout(0.33))
-	model.add(Dense(332,
-		init='uniform', activation='tanh')
-	)
-	model.add(Dropout(0.1375))
-	model.add(Dense(44,
-		init='uniform', activation='tanh')
-	)
-	model.add(Dropout(0.298))
-	model.add(Dense(1,
-		init='uniform', activation='sigmoid')
-	)
-	# Compile model
-	model.compile(
-		loss='binary_crossentropy',
-		optimizer='adagrad', metrics=['accuracy'],
-	)
-	return model
+np.random.seed(42)
 
 class FixedKerasClassifier(KerasClassifier):
 	def predict_proba(self, X, **kwargs):
@@ -55,8 +25,9 @@ class FixedKerasClassifier(KerasClassifier):
 
 
 class EnsembleClassifier(BaseEstimator, ClassifierMixin):
-	def __init__(self, estimators=list()):
+	def __init__(self, estimators=list(), weights=list()):
 		self.estimators_ = estimators
+		self.weights_ = weights
 		self.predictions_ = list()
 		
 	def fit(self, X, y):
@@ -65,18 +36,21 @@ class EnsembleClassifier(BaseEstimator, ClassifierMixin):
 
 	def predict_proba(self, x):
 		self.predictions_ = list()
-		for name, preproc, est in self.estimators_:
-			self.predictions_.append(
-				est.predict_proba(MetaClassifier.applyPreproc(preproc, x))
-			)
+		if not self.weights_ or len(self.weights_) != len(self.estimators_):
+			self.weights_ = np.ones(len(self.estimators_))
+		weights = normalize(np.array([self.weights_]))[0]
+		for (name, preproc, est), weight in zip(self.estimators_, weights):
+			predictions = est.predict_proba(MetaClassifier.applyPreproc(preproc, x))
+			self.predictions_.append(predictions*weight)
+		
 		return np.mean(self.predictions_, axis=0)
 
 class MetaClassifier(object):
 
-	def __init__(self):
-		self.__metaClf = EnsembleClassifier()
+	def __init__(self, weights=list()):
+		self.__metaClf = EnsembleClassifier(weights=weights)
 		self.feature_importances_ = list()
-	
+		
 	def train(self, X, y):
 		X = X.astype(np.float32)
 		y = y.astype(np.int32)
@@ -89,8 +63,11 @@ class MetaClassifier(object):
 	def predict_proba(self, x):
 		return self.__metaClf.predict_proba(x)
 	
-	def getClassifierList(self):
+	def getEstimatorList(self):
 		return self.__metaClf.estimators_
+	
+	def resetEstimatorList(self):
+		self.__metaClf.estimators_ = list()
 	
 	@staticmethod
 	def applyPreproc(preproc, x):
@@ -131,44 +108,39 @@ class MetaClassifier(object):
 	
 	def addRF(self, preproc=None, params={}):
 		name = 'RF'
-		self.getClassifierList().append((name, preproc, RandomForestClassifier(**params)))
+		self.getEstimatorList().append((name, preproc, RandomForestClassifier(**params)))
 
 	def addLR(self, preproc=None, params={}):
 		name = 'LR'
-		self.getClassifierList().append((name, preproc, LogisticRegression(**params)))
+		self.getEstimatorList().append((name, preproc, LogisticRegression(**params)))
 
 	def addGBC(self, preproc=None, params={}):
 		name = 'GBC'
-		self.getClassifierList().append((name, preproc, GradientBoostingClassifier(**params)))
+		self.getEstimatorList().append((name, preproc, GradientBoostingClassifier(**params)))
 
 	def addXGBC(self, preproc=None, params={}):
 		name = 'XGBC'
-		self.getClassifierList().append((name, preproc, xgboost.XGBClassifier(**params)))
+		self.getEstimatorList().append((name, preproc, xgboost.XGBClassifier(**params)))
 
 	def addKNC(self, preproc=None, params={}):
 		name = 'KNC'
-		self.getClassifierList().append((name, preproc, KNeighborsClassifier(**params)))
-	
-	#def addMLP(self, preproc=None, params={}):
-	#	name = 'MLP'
-	#	params.update(params)
-	#	self.getClassifierList().append((name, preproc, KNeighborsClassifier(**params)))
+		self.getEstimatorList().append((name, preproc, KNeighborsClassifier(**params)))
 	
 	def addBRBM(self, preproc=None, params={}):
 		name = 'BRBM'
-		self.getClassifierList().append((name, preproc, BernoulliRBM(**params)))
+		self.getEstimatorList().append((name, preproc, BernoulliRBM(**params)))
 	
 	def addKNN(self, preproc=None, params={}):
 		name = 'KNN'
 		
-		clf = FixedKerasClassifier(
+		est = FixedKerasClassifier(
 			build_fn=params['build_fn'],
 			nb_epoch=params['nb_epoch'],
 			#batch_size=params['batch_size'],
-			verbose=1
+			verbose=0
 		)
 		
-		self.getClassifierList().append((name, preproc, clf))
+		self.getEstimatorList().append((name, preproc, est))
 
 	def addLNN(self, preproc=None, params={}):
 		name = 'LNN'		
@@ -195,7 +167,7 @@ class MetaClassifier(object):
 			('output', DenseLayer)
 		]
 		input_shape = params['input_shape']
-		nn = NeuralNet(layers=layers,
+		est = NeuralNet(layers=layers,
 			input_shape=(None, input_shape),
 			dense0_num_units=params['dense0_num_units'],
 			dense0_nonlinearity=tanh,
@@ -210,13 +182,12 @@ class MetaClassifier(object):
 			output_nonlinearity=softmax,
 			update=adagrad,
 			update_learning_rate=params['update_learning_rate'],
-			#objective = 
-			train_split=TrainSplit(params['train_split']),
+			#train_split=TrainSplit(params['train_split']),
+			max_epochs=params['max_epochs'],
 			verbose=1,
-			max_epochs=params['max_epochs']
 		)
 		
-		self.getClassifierList().append((name, preproc, nn))
+		self.getEstimatorList().append((name, preproc, est))
 	
 
 	def __getFeatureImportance(self):

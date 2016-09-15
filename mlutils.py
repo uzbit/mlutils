@@ -281,7 +281,7 @@ def do_lnn_hyperopt_search(X, y, cv=3, testSize=0.2, seed=42):
 	bestParams = fmin(score, space,
 		algo=tpe.suggest,
 		trials=trials,
-		max_evals=100,
+		max_evals=20,
 		#rseed=None
 	)
 	for param in intParams:
@@ -381,7 +381,6 @@ def do_knn_hyperopt_search(X, y, cv=3, testSize=0.2, seed=42):
 					#'batch_size': int(params['batch_size']),
 				}
 			)
-			print "Num estimators", len(mcObj.getEstimatorList())
 			mcObj.train(X_train, y_train)
 			results.append(get_auc(mcObj, X_test, y_test))
 
@@ -394,7 +393,7 @@ def do_knn_hyperopt_search(X, y, cv=3, testSize=0.2, seed=42):
 	bestParams = fmin(score, space,
 		algo=tpe.suggest,
 		trials=trials,
-		max_evals=2,
+		max_evals=20,
 	)
 	for param in intParams:
 		bestParams[param] = int(bestParams[param])

@@ -134,9 +134,9 @@ class MetaClassifier(object):
 		
 		est = FixedKerasClassifier(
 			build_fn=params['build_fn'],
-			nb_epoch=2,#params['nb_epoch'],
-			batch_size=64,#params['batch_size'],
-			verbose=1
+			nb_epoch=params['nb_epoch'],
+			batch_size=64, #params['batch_size'],
+			verbose=0
 		)
 		
 		self.getEstimatorList().append((name, preproc, est))

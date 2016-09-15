@@ -38,12 +38,11 @@ class EnsembleClassifier(BaseEstimator, ClassifierMixin):
 		self.predictions_ = list()
 		if not self.weights_ or len(self.weights_) != len(self.estimators_):
 			self.weights_ = np.ones(len(self.estimators_))
-		weights = normalize(np.array([self.weights_]))[0]
+		weights = self.weights_/np.sum(self.weights_)
 		for (name, preproc, est), weight in zip(self.estimators_, weights):
 			predictions = est.predict_proba(MetaClassifier.applyPreproc(preproc, x))
 			self.predictions_.append(predictions*weight)
-		
-		return np.mean(self.predictions_, axis=0)
+		return np.sum(self.predictions_, axis=0)
 
 class MetaClassifier(object):
 
@@ -135,9 +134,9 @@ class MetaClassifier(object):
 		
 		est = FixedKerasClassifier(
 			build_fn=params['build_fn'],
-			nb_epoch=params['nb_epoch'],
-			#batch_size=params['batch_size'],
-			verbose=0
+			nb_epoch=2,#params['nb_epoch'],
+			batch_size=64,#params['batch_size'],
+			verbose=1
 		)
 		
 		self.getEstimatorList().append((name, preproc, est))

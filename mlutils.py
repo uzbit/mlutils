@@ -264,6 +264,7 @@ def do_lnn_hyperopt_search(X, y, cv=3, testSize=0.2, seed=42):
 			print "Train shape", X_train.shape
 			standardScaler.fit(X_train)
 			mcObj = MetaClassifier()
+			mcObj.resetEstimatorList() # why is this fucking necessary?!
 			mcObj.addLNN(
 				preproc=scalePreproc,
 				params=params
@@ -309,6 +310,7 @@ def do_knn_hyperopt_search(X, y, cv=3, testSize=0.2, seed=42):
 		'dense1_num_units',
 		'dense2_num_units',
 		'nb_epoch',
+		#'batch_size',
 	]
 	
 	space = {
@@ -320,6 +322,7 @@ def do_knn_hyperopt_search(X, y, cv=3, testSize=0.2, seed=42):
 		'dropout1_p' : hp.uniform('dropout1_p', 0.1, 0.5),
 		'dropout2_p' : hp.uniform('dropout2_p', 0.1, 0.5),
 		'nb_epoch' : hp.qloguniform('nb_epoch', np.log(5e1), np.log(1e2), 1), #hp.choice('max_epochs', intChoices['max_epochs']),
+		#'batch_size' : hp.quniform('batch_size', 1, 32, 1),
 	}
 
 	def score(params):
@@ -333,20 +336,20 @@ def do_knn_hyperopt_search(X, y, cv=3, testSize=0.2, seed=42):
 			model = Sequential()
 			sgd = SGD(lr=params['update_learning_rate'], decay=1e-6, momentum=0.9, nesterov=True)
 			
-			model.add(Dense(params['dense0_num_units'],
+			model.add(Dense(int(params['dense0_num_units']),
 				input_dim=params['input_shape'] ,
 				init='uniform', activation='tanh')
 			)
 			model.add(Dropout(params['dropout0_p']))
-			model.add(Dense(params['dense1_num_units'],
+			model.add(Dense(int(params['dense1_num_units']),
 				init='uniform', activation='tanh')
 			)
 			model.add(Dropout(params['dropout1_p']))
-			model.add(Dense(params['dense2_num_units'],
+			model.add(Dense(int(params['dense2_num_units']),
 				init='uniform', activation='tanh')
 			)
 			model.add(Dropout(params['dropout2_p']))
-			model.add(Dense(params['output_shape'],
+			model.add(Dense(int(params['output_shape']),
 				init='uniform', activation='sigmoid')
 			)
 			# Compile model
@@ -369,10 +372,24 @@ def do_knn_hyperopt_search(X, y, cv=3, testSize=0.2, seed=42):
 			print "Train shape", X_train.shape
 			standardScaler.fit(X_train)
 			mcObj = MetaClassifier()
+			mcObj.resetEstimatorList() # why is this fucking necessary?!
 			mcObj.addKNN(
 				preproc=scalePreproc,
-				params={'build_fn': build_fn, 'nb_epoch': params['nb_epoch']}
+				params={
+					'build_fn': build_fn,
+					'nb_epoch': int(params['nb_epoch']),
+					#'batch_size': int(params['batch_size']),
+				}
 			)
+			mcObj.addKNN(
+				preproc=scalePreproc,
+				params={
+					'build_fn': build_fn,
+					'nb_epoch': int(params['nb_epoch']),
+					#'batch_size': int(params['batch_size']),
+				}
+			)
+			print "Num estimators", len(mcObj.getEstimatorList())
 			mcObj.train(X_train, y_train)
 			results.append(get_auc(mcObj, X_test, y_test))
 
@@ -385,7 +402,7 @@ def do_knn_hyperopt_search(X, y, cv=3, testSize=0.2, seed=42):
 	bestParams = fmin(score, space,
 		algo=tpe.suggest,
 		trials=trials,
-		max_evals=100,
+		max_evals=2,
 	)
 	for param in intParams:
 		bestParams[param] = int(bestParams[param])

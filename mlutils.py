@@ -381,14 +381,6 @@ def do_knn_hyperopt_search(X, y, cv=3, testSize=0.2, seed=42):
 					#'batch_size': int(params['batch_size']),
 				}
 			)
-			mcObj.addKNN(
-				preproc=scalePreproc,
-				params={
-					'build_fn': build_fn,
-					'nb_epoch': int(params['nb_epoch']),
-					#'batch_size': int(params['batch_size']),
-				}
-			)
 			print "Num estimators", len(mcObj.getEstimatorList())
 			mcObj.train(X_train, y_train)
 			results.append(get_auc(mcObj, X_test, y_test))

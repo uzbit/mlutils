@@ -3,8 +3,8 @@ import unittest, os
 import numpy
 from sklearn import datasets
 from sklearn.cross_validation import train_test_split
-from sklearn.metrics import f1_score
 from mlutils.MetaClassifier import MetaClassifier
+from mlutils.mlutils import get_auc
 
 class MetaClassifierTest(unittest.TestCase):
 
@@ -22,11 +22,11 @@ class MetaClassifierTest(unittest.TestCase):
 		self.params = MetaClassifier.getDefaultParams()
 
 	def test1(self):
-		mc = MetaClassifier(self.params)
-		mc.train(self.Xtrain, self.ytrain)
+		mcObj = MetaClassifier(self.params)
+		mcObj.addKNC()
+		mcObj.train(self.Xtrain, self.ytrain)
 		
-		preds = mc.predict(self.Xtest)
-		print "Score: ", f1_score(self.ytest, preds, average='weighted')
+		print "AUC Score: ", get_auc(mcObj, self.Xtest, self.ytest)
 
 if __name__ == '__main__':
 	unittest.main()

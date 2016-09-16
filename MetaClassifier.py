@@ -23,50 +23,42 @@ class FixedKerasClassifier(KerasClassifier):
 			probs = np.hstack([1-probs,probs]) 
 		return probs		
 
-class EnsembleClassifier(BaseEstimator, ClassifierMixin):
-	def __init__(self, estimators=list(), weights=list()):
-		self.estimators_ = estimators
-		self.weights_ = weights
-		self.predictions_ = list()
-		
-	def fit(self, X, y):
-		for name, preproc, est in self.estimators_:
-			est.fit(MetaClassifier.applyPreproc(preproc, X), y)
-
-	def predict_proba(self, x):
-		self.predictions_ = list()
-		if not self.weights_ or len(self.weights_) != len(self.estimators_):
-			self.weights_ = np.ones(len(self.estimators_))
-		weights = self.weights_/np.sum(self.weights_)
-		for (name, preproc, est), weight in zip(self.estimators_, weights):
-			predictions = est.predict_proba(MetaClassifier.applyPreproc(preproc, x))
-			self.predictions_.append(predictions*weight)
-		return np.sum(self.predictions_, axis=0)
-
 class MetaClassifier(object):
 
 	def __init__(self, weights=list()):
-		self.__metaClf = EnsembleClassifier(weights=weights)
+		self.__estimators = list()
+		self.__weights = weights
 		self.feature_importances_ = list()
 		
+	def fit(self, X, y):
+		for name, preproc, est in self.__estimators:
+			est.fit(MetaClassifier.applyPreproc(preproc, X), y)
+
 	def train(self, X, y):
 		X = X.astype(np.float32)
 		y = y.astype(np.int32)
 		
-		self.__metaClf.fit(X, y)
-		
-	def predict(self, x):
-		return self.__metaClf.predict(x)
-	
+		self.fit(X, y)
+
 	def predict_proba(self, x):
-		return self.__metaClf.predict_proba(x)
+		if not self.__weights or len(self.__weights) != len(self.__estimators):
+			self.__weights = np.ones(len(self.__estimators))
+		else:
+			self.__weights = weights
+
+		predictions = list()
+		weights = self.__weights/np.sum(self.__weights)
+		for (name, preproc, est), weight in zip(self.__estimators, weights):
+			probs = est.predict_proba(MetaClassifier.applyPreproc(preproc, x))
+			predictions.append(probs*weight)
+		return np.sum(predictions, axis=0)
 	
 	def getEstimatorList(self):
-		return self.__metaClf.estimators_
+		return self.__estimators
 	
 	def resetEstimatorList(self):
-		self.__metaClf.estimators_ = list()
-	
+		self.__estimators = list()
+
 	@staticmethod
 	def applyPreproc(preproc, x):
 		if preproc:
@@ -74,7 +66,7 @@ class MetaClassifier(object):
 			return preproc(x_)
 		else:
 			return x
-			
+	
 	@staticmethod
 	def getDefaultParams():
 		return {
@@ -194,7 +186,7 @@ class MetaClassifier(object):
 	
 
 	def __getFeatureImportance(self):
-		for est in self.__metaClf.estimators_:
+		for est in self.__estimators:
 			if type(est) is xgboost.XGBClassifier:
 				self.feature_importances_ = est.feature_importances_
 	

@@ -1,6 +1,7 @@
 
 import unittest, os
 import numpy as np
+import dill as pickle
 from sklearn import datasets
 from sklearn.cross_validation import train_test_split
 from mlutils.MetaClassifier import MetaClassifier
@@ -34,6 +35,12 @@ class MetaClassifierTest(unittest.TestCase):
 		mcObj = MetaClassifier(self.params)
 		mcObj.addKNC()
 		print len(mcObj.getEstimatorList())
+		
+	def test3(self):
+		mcObj = MetaClassifier(self.params)
+		mcObj.addKNC()
+		print len(mcObj.getEstimatorList())
+		pickle.dump(mcObj, open('test.pickle', 'wb'))
 
 if __name__ == '__main__':
 	unittest.main()

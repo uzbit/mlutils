@@ -1,19 +1,19 @@
 import numpy as np
-
 from sknn.platform import gpu32
 from sklearn.linear_model import LogisticRegression
 from sklearn.neighbors import KNeighborsClassifier
 from sklearn.ensemble import RandomForestClassifier
 from sklearn.ensemble import GradientBoostingClassifier
+from sklearn.ensemble import ExtraTreesClassifier
 from sklearn.base import BaseEstimator, ClassifierMixin
 from sklearn.neural_network import BernoulliRBM
 from sklearn.preprocessing import normalize
 from keras.wrappers.scikit_learn import KerasClassifier
 from keras.models import Sequential
-
 import xgboost
 
-np.random.seed(42)
+SEED = 42
+np.random.seed(SEED)
 
 class FixedKerasClassifier(KerasClassifier):
 	def predict_proba(self, X, **kwargs):
@@ -22,7 +22,6 @@ class FixedKerasClassifier(KerasClassifier):
 		if(probs.shape[1] == 1):
 			probs = np.hstack([1-probs,probs]) 
 		return probs		
-
 
 class EnsembleClassifier(BaseEstimator, ClassifierMixin):
 	def __init__(self, estimators=list(), weights=list()):
@@ -79,13 +78,14 @@ class MetaClassifier(object):
 	@staticmethod
 	def getDefaultParams():
 		return {
-			'RF': {'random_state': 42},
+			'RFC': {'random_state': SEED},
+			'ETC': {'random_state': SEED},
 			'LR': {},
-			'GBC': {'random_state': 42},
-			'XGBC': {'seed': 42},
-			'MLP': {'random_state': 42},
+			'GBC': {'random_state': SEED},
+			'XGBC': {'seed': SEED},
+			'MLP': {'random_state': SEED},
 			'KNC': {'n_jobs':-1},
-			'BRBM': {'random_state': 42},
+			'BRBM': {'random_state': SEED},
 			'KNN': {},
 			'LNN': {
 				'dense0_num_units' : 1000,
@@ -105,9 +105,13 @@ class MetaClassifier(object):
 	def getParams(self):
 		return self.__params
 	
-	def addRF(self, preproc=None, params={}):
-		name = 'RF'
+	def addRFC(self, preproc=None, params={}):
+		name = 'RFC'
 		self.getEstimatorList().append((name, preproc, RandomForestClassifier(**params)))
+	
+	def addETC(self, preproc=None, params={}):
+		name = 'ETC'
+		self.getEstimatorList().append((name, preproc, ExtraTreesClassifier(**params)))
 
 	def addLR(self, preproc=None, params={}):
 		name = 'LR'
@@ -153,7 +157,7 @@ class MetaClassifier(object):
 		from lasagne.objectives import binary_crossentropy
 		import lasagne
 		
-		lasagne.random.set_rng(np.random.RandomState(1))
+		lasagne.random.set_rng(np.random.RandomState(SEED))
 		
 		layers = [
 			('input', InputLayer),

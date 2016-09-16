@@ -12,7 +12,8 @@ from bayes_opt.bayesian_optimization import BayesianOptimization
 
 from MetaClassifier import MetaClassifier
 
-LOGIT_ACCEPT_RATE = 0.95
+LOGIT_ACCEPT_RATE = 0.5
+SEED = 42
 
 def plot_hist(y1, y2 = None, binFactor=50.0, title=''):
 	thisMax = max(y1)
@@ -105,7 +106,7 @@ def do_evo_search(X, y,
 	print "Performing evolutionary search..."
 	from evolutionary_search import EvolutionaryAlgorithmSearchCV
 	from sklearn.pipeline import Pipeline
-	X_train, X_test, y_train, y_test = train_test_split(X, y, test_size=0.5, stratify=y, random_state=42)
+	X_train, X_test, y_train, y_test = train_test_split(X, y, test_size=0.5, stratify=y, random_state=SEED)
 	print "Training on ", X_test.shape
 
 	if not grid:
@@ -156,7 +157,7 @@ def do_evo_search(X, y,
 	print bestParams
 	return bestParams
 
-def do_hyperopt_search(X, y, cv=3, testSize=0.2, seed=42):
+def do_hyperopt_search(X, y, cv=3, testSize=0.2, seed=SEED):
 	if os.path.exists('bestParams.pickle'):
 		return pickle.load(open('bestParams.pickle', 'rb'))
 
@@ -219,7 +220,7 @@ def do_hyperopt_search(X, y, cv=3, testSize=0.2, seed=42):
 	pickle.dump(bestParams, open('bestParams.pickle', 'wb'))
 	return bestParams
 
-def do_lnn_hyperopt_search(X, y, cv=3, testSize=0.2, seed=42):
+def do_lnn_hyperopt_search(X, y, cv=3, testSize=0.2, seed=SEED):
 	
 	from hyperopt import hp
 	from hyperopt import fmin, tpe, hp, STATUS_OK, Trials
@@ -286,14 +287,17 @@ def do_lnn_hyperopt_search(X, y, cv=3, testSize=0.2, seed=42):
 	)
 	for param in intParams:
 		bestParams[param] = int(bestParams[param])
-		
+
+	bestParams['input_shape'] = X.shape[1]
+	bestParams['output_shape'] = 2
+
 	print "Saving the best parameters: ", bestParams
 
 	pickle.dump(bestParams, open('bestParams_lnn.pickle', 'wb'))
 	return bestParams
 
 
-def do_knn_hyperopt_search(X, y, cv=3, testSize=0.2, seed=42):
+def do_knn_hyperopt_search(X, y, cv=3, testSize=0.2, seed=SEED):
 	
 	from hyperopt import hp
 	from hyperopt import fmin, tpe, hp, STATUS_OK, Trials
@@ -398,6 +402,9 @@ def do_knn_hyperopt_search(X, y, cv=3, testSize=0.2, seed=42):
 	for param in intParams:
 		bestParams[param] = int(bestParams[param])
 		
+	bestParams['input_shape'] = X.shape[1]
+	bestParams['output_shape'] = 1
+
 	print "Saving the best parameters: ", bestParams
 
 	pickle.dump(bestParams, open('bestParams_knn.pickle', 'wb'))
@@ -535,7 +542,7 @@ def do_random_search(X, y, nIter=3,
 			scoring='roc_auc',
 			param_distributions=grid,
 			n_iter=nIter,
-			random_state=42,
+			random_state=SEED,
 			verbose=100
 		)
 

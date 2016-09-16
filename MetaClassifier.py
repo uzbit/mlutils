@@ -1,5 +1,6 @@
 import numpy as np
 from sknn.platform import gpu32
+from sklearn.preprocessing import StandardScaler
 from sklearn.linear_model import LogisticRegression
 from sklearn.neighbors import KNeighborsClassifier
 from sklearn.ensemble import RandomForestClassifier
@@ -29,27 +30,25 @@ class MetaClassifier(object):
 		self.__estimators = list()
 		self.__weights = weights
 		self.feature_importances_ = list()
+		self.standardScaler = StandardScaler()
 		
 	def fit(self, X, y):
-		for name, preproc, est in self.__estimators:
-			est.fit(MetaClassifier.applyPreproc(preproc, X), y)
-
-	def train(self, X, y):
 		X = X.astype(np.float32)
 		y = y.astype(np.int32)
 		
-		self.fit(X, y)
+		self.standardScaler.fit(X)
+
+		for name, preproc, est in self.__estimators:
+			est.fit(self.applyPreproc(preproc, X), y)
 
 	def predict_proba(self, x):
 		if not self.__weights or len(self.__weights) != len(self.__estimators):
 			self.__weights = np.ones(len(self.__estimators))
-		else:
-			self.__weights = weights
-
+		
 		predictions = list()
 		weights = self.__weights/np.sum(self.__weights)
 		for (name, preproc, est), weight in zip(self.__estimators, weights):
-			probs = est.predict_proba(MetaClassifier.applyPreproc(preproc, x))
+			probs = est.predict_proba(self.applyPreproc(preproc, x))
 			predictions.append(probs*weight)
 		return np.sum(predictions, axis=0)
 	
@@ -59,8 +58,9 @@ class MetaClassifier(object):
 	def resetEstimatorList(self):
 		self.__estimators = list()
 
-	@staticmethod
-	def applyPreproc(preproc, x):
+	def applyPreproc(self, preproc, x):
+		if preproc == 'scale':
+			return self.standardScaler.transform(x)
 		if preproc:
 			x_ = np.copy(x)
 			return preproc(x_)

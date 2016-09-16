@@ -27,7 +27,7 @@ class MetaClassifierTest(unittest.TestCase):
 	def test1(self):
 		mcObj = MetaClassifier(self.params)
 		mcObj.addKNC()
-		mcObj.train(self.Xtrain, self.ytrain)
+		mcObj.fit(self.Xtrain, self.ytrain)
 		
 		print "AUC Score: ", get_auc(mcObj, self.Xtest, self.ytest)
 

@@ -50,7 +50,7 @@ class MetaClassifier(object):
 		
 		predictions = list()
 		weights = self.__weights/np.sum(self.__weights)
-		print "Using weights", weights
+		
 		for (name, preproc, est), weight in zip(self.__estimators, weights):
 			probs = est.predict_proba(self.applyPreproc(preproc, x))
 			predictions.append(probs*weight)

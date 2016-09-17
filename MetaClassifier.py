@@ -16,13 +16,11 @@ import xgboost
 SEED = 42
 np.random.seed(SEED)
 
-class FixedKerasClassifier(KerasClassifier):
-	def predict_proba(self, X, **kwargs):
-		kwargs = self.filter_sk_params(Sequential.predict_proba, kwargs)
-		probs = self.model.predict_proba(X, **kwargs)
-		if(probs.shape[1] == 1):
-			probs = np.hstack([1-probs,probs]) 
-		return probs		
+class MetaClassifierException(Exception):
+	def __init__(self, e):
+		self.exception = e
+	def __str__(self):
+		return self.exception
 
 class MetaClassifier(object):
 
@@ -41,12 +39,18 @@ class MetaClassifier(object):
 		for name, preproc, est in self.__estimators:
 			est.fit(self.applyPreproc(preproc, X), y)
 
+		self.__getFeatureImportance()
+		
 	def predict_proba(self, x):
-		if not self.__weights or len(self.__weights) != len(self.__estimators):
+		if not self.__weights:
 			self.__weights = np.ones(len(self.__estimators))
+		
+		if len(self.__weights) != len(self.__estimators):
+			raise MetaClassifierException("Number of weights to estimator mismatch!")
 		
 		predictions = list()
 		weights = self.__weights/np.sum(self.__weights)
+		print "Using weights", weights
 		for (name, preproc, est), weight in zip(self.__estimators, weights):
 			probs = est.predict_proba(self.applyPreproc(preproc, x))
 			predictions.append(probs*weight)
@@ -60,12 +64,14 @@ class MetaClassifier(object):
 
 	def applyPreproc(self, preproc, x):
 		if preproc == 'scale':
-			return self.standardScaler.transform(x)
+			x_ = self.standardScaler.transform(x)
+			return x_.astype(np.float32)
 		if preproc:
 			x_ = np.copy(x)
-			return preproc(x_)
+			x_ = preproc(x_)
+			return x_.astype(np.float32)
 		else:
-			return x
+			return x.astype(np.float32)
 	
 	@staticmethod
 	def getDefaultParams():
@@ -128,7 +134,7 @@ class MetaClassifier(object):
 	def addKNN(self, preproc=None, params={}):
 		name = 'KNN'
 		
-		est = FixedKerasClassifier(
+		est = KerasClassifier(
 			build_fn=params['build_fn'],
 			nb_epoch=params['nb_epoch'],
 			batch_size=64, #params['batch_size'],

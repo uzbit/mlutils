@@ -6,11 +6,20 @@ from sklearn.neighbors import KNeighborsClassifier
 from sklearn.ensemble import RandomForestClassifier
 from sklearn.ensemble import GradientBoostingClassifier
 from sklearn.ensemble import ExtraTreesClassifier
-from sklearn.base import BaseEstimator, ClassifierMixin
 from sklearn.neural_network import BernoulliRBM
+from sklearn.neural_network import MLPClassifier
 from sklearn.preprocessing import normalize
 from keras.wrappers.scikit_learn import KerasClassifier
 from keras.models import Sequential
+from nolearn.lasagne import NeuralNet
+from nolearn.lasagne import TrainSplit
+from lasagne.layers import DenseLayer
+from lasagne.layers import InputLayer
+from lasagne.layers import DropoutLayer
+from lasagne.updates import adagrad, nesterov_momentum
+from lasagne.nonlinearities import softmax, tanh
+from lasagne.objectives import binary_crossentropy
+import lasagne
 import xgboost
 
 SEED = 42
@@ -39,10 +48,10 @@ class MetaClassifier(object):
 		for name, preproc, est in self.__estimators:
 			est.fit(self.applyPreproc(preproc, X), y)
 
-		self.__getFeatureImportance()
+		self.getFeatureImportance()
 		
 	def predict_proba(self, x):
-		if not self.__weights:
+		if not list(self.__weights):
 			self.__weights = np.ones(len(self.__estimators))
 		
 		if len(self.__weights) != len(self.__estimators):
@@ -58,7 +67,15 @@ class MetaClassifier(object):
 	
 	def getEstimatorList(self):
 		return self.__estimators
-	
+
+	def getFeatureImportance(self):
+		featImportance = list()
+		for (name, preproc, est) in self.__estimators:
+			if hasattr(est, 'feature_importances_'):
+				featImportance.append(est.feature_importances_)
+		featImportance = np.mean(np.array(featImportance), axis=0)
+		return featImportance
+
 	def resetEstimatorList(self):
 		self.__estimators = list()
 
@@ -84,6 +101,7 @@ class MetaClassifier(object):
 			'MLP': {'random_state': SEED},
 			'KNC': {'n_jobs':-1},
 			'BRBM': {'random_state': SEED},
+			'MLPC': {'random_state': SEED},
 			'KNN': {},
 			'LNN': {
 				'dense0_num_units' : 1000,
@@ -131,6 +149,10 @@ class MetaClassifier(object):
 		name = 'BRBM'
 		self.getEstimatorList().append((name, preproc, BernoulliRBM(**params)))
 	
+	def addMLPC(self, preproc=None, params={}):
+		name = 'MLPC'
+		self.getEstimatorList().append((name, preproc, MLPClassifier(**params)))
+	
 	def addKNN(self, preproc=None, params={}):
 		name = 'KNN'
 		
@@ -145,15 +167,6 @@ class MetaClassifier(object):
 
 	def addLNN(self, preproc=None, params={}):
 		name = 'LNN'		
-		from nolearn.lasagne import NeuralNet
-		from nolearn.lasagne import TrainSplit
-		from lasagne.layers import DenseLayer
-		from lasagne.layers import InputLayer
-		from lasagne.layers import DropoutLayer
-		from lasagne.updates import adagrad, nesterov_momentum
-		from lasagne.nonlinearities import softmax, sigmoid, softplus, tanh
-		from lasagne.objectives import binary_crossentropy
-		import lasagne
 		
 		lasagne.random.set_rng(np.random.RandomState(SEED))
 		
@@ -190,9 +203,4 @@ class MetaClassifier(object):
 		
 		self.getEstimatorList().append((name, preproc, est))
 	
-
-	def __getFeatureImportance(self):
-		for est in self.__estimators:
-			if type(est) is xgboost.XGBClassifier:
-				self.feature_importances_ = est.feature_importances_
-	
+		

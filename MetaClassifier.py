@@ -73,7 +73,8 @@ class MetaClassifier(object):
 		for (name, preproc, est) in self.__estimators:
 			if hasattr(est, 'feature_importances_'):
 				featImportance.append(est.feature_importances_)
-		featImportance = np.mean(np.array(featImportance), axis=0)
+		if featImportance:
+			featImportance = np.mean(np.array(featImportance), axis=0)
 		return featImportance
 
 	def resetEstimatorList(self):

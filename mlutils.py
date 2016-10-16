@@ -81,7 +81,7 @@ def get_labelencoder(column_values):
 	le.fit(column_values)
 	return le
 
-def get_remove_features(df, featureColumns, N=5):
+def get_remove_features(df, featureColumns, N=4):
 	removeList = []
 	for feat in featureColumns:
 		vals = df[feat].values
@@ -221,19 +221,19 @@ def do_hyperopt_search(X, y, cv=3, testSize=0.2, seed=SEED):
 	return bestParams
 
 def do_lnn_hyperopt_search(X, y, cv=3, testSize=0.2, seed=SEED):
-	
+
 	from hyperopt import hp
 	from hyperopt import fmin, tpe, hp, STATUS_OK, Trials
 
 	print "Performing LNN hyperopt search..."
-	
+
 	intParams = [
 		'dense0_num_units',
 		'dense1_num_units',
 		'dense2_num_units',
 		'max_epochs',
 	]
-	
+
 	space = {
 		'dense0_num_units' : hp.qloguniform('dense0_num_units', np.log(1e3), np.log(1e4), 1), #hp.choice('dense0_num_units', intChoices['dense0_num_units']),
 		'dense1_num_units' : hp.qloguniform('dense1_num_units', np.log(1e2), np.log(1e3), 1), #hp.choice('dense1_num_units', intChoices['dense1_num_units']),
@@ -252,12 +252,12 @@ def do_lnn_hyperopt_search(X, y, cv=3, testSize=0.2, seed=SEED):
 		standardScaler = StandardScaler()
 		def scalePreproc(X):
 			return standardScaler.transform(X)
-		
+
 		params['input_shape'] = X.shape[1]
 		params['output_shape'] = 2
 		for param in intParams:
 			params[param] = int(params[param])
-		
+
 		for i in xrange(cv):
 			X_train, X_test, y_train, y_test = train_test_split(
 				X, y, test_size=testSize, stratify=y, random_state=seed+i
@@ -298,7 +298,7 @@ def do_lnn_hyperopt_search(X, y, cv=3, testSize=0.2, seed=SEED):
 
 
 def do_knn_hyperopt_search(X, y, cv=3, testSize=0.2, seed=SEED):
-	
+
 	from hyperopt import hp
 	from hyperopt import fmin, tpe, hp, STATUS_OK, Trials
 	from keras.wrappers.scikit_learn import KerasClassifier
@@ -308,7 +308,7 @@ def do_knn_hyperopt_search(X, y, cv=3, testSize=0.2, seed=SEED):
 	from keras.optimizers import SGD
 
 	print "Performing KNN hyperopt search..."
-	
+
 	intParams = [
 		'dense0_num_units',
 		'dense1_num_units',
@@ -316,7 +316,7 @@ def do_knn_hyperopt_search(X, y, cv=3, testSize=0.2, seed=SEED):
 		'nb_epoch',
 		#'batch_size',
 	]
-	
+
 	space = {
 		'dense0_num_units' : hp.qloguniform('dense0_num_units', np.log(1e3), np.log(1e4), 1), #hp.choice('dense0_num_units', intChoices['dense0_num_units']),
 		'dense1_num_units' : hp.qloguniform('dense1_num_units', np.log(1e2), np.log(1e3), 1), #hp.choice('dense1_num_units', intChoices['dense1_num_units']),
@@ -335,11 +335,11 @@ def do_knn_hyperopt_search(X, y, cv=3, testSize=0.2, seed=SEED):
 		standardScaler = StandardScaler()
 		def scalePreproc(X):
 			return standardScaler.transform(X)
-		
+
 		def build_fn():
 			model = Sequential()
 			sgd = SGD(lr=params['update_learning_rate'], decay=1e-6, momentum=0.9, nesterov=True)
-			
+
 			model.add(Dense(int(params['dense0_num_units']),
 				input_dim=params['input_shape'] ,
 				init='uniform', activation='tanh')
@@ -362,13 +362,13 @@ def do_knn_hyperopt_search(X, y, cv=3, testSize=0.2, seed=SEED):
 				optimizer='adagrad', metrics=['accuracy'],
 			)
 			return model
-		
+
 		params['input_shape'] = X.shape[1]
 		params['output_shape'] = 1
-		
+
 		for param in intParams:
 			params[param] = int(params[param])
-		
+
 		for i in xrange(cv):
 			X_train, X_test, y_train, y_test = train_test_split(
 				X, y, test_size=testSize, stratify=y, random_state=seed+i
@@ -401,7 +401,7 @@ def do_knn_hyperopt_search(X, y, cv=3, testSize=0.2, seed=SEED):
 	)
 	for param in intParams:
 		bestParams[param] = int(bestParams[param])
-		
+
 	bestParams['input_shape'] = X.shape[1]
 	bestParams['output_shape'] = 1
 

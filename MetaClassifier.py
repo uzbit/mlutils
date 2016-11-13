@@ -1,4 +1,6 @@
+import xgboost as xgb
 import numpy as np
+
 from sknn.platform import gpu32
 from sklearn.preprocessing import StandardScaler
 from sklearn.linear_model import LogisticRegression
@@ -9,18 +11,19 @@ from sklearn.ensemble import ExtraTreesClassifier
 from sklearn.svm import SVC
 from sklearn.neural_network import MLPClassifier
 from sklearn.preprocessing import normalize
+
 from keras.wrappers.scikit_learn import KerasClassifier
 from keras.models import Sequential
-from nolearn.lasagne import NeuralNet
-from nolearn.lasagne import TrainSplit
+
+import lasagne
 from lasagne.layers import DenseLayer
 from lasagne.layers import InputLayer
 from lasagne.layers import DropoutLayer
 from lasagne.updates import adagrad, nesterov_momentum
 from lasagne.nonlinearities import softmax, tanh
 from lasagne.objectives import binary_crossentropy
-import lasagne
-import xgboost
+from nolearn.lasagne import NeuralNet
+from nolearn.lasagne import TrainSplit
 
 SEED = 42
 np.random.seed(SEED)

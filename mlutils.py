@@ -8,7 +8,6 @@ import xgboost as xgb
 from sklearn.preprocessing import LabelEncoder
 from sklearn.metrics import confusion_matrix,  matthews_corrcoef, make_scorer, roc_curve, auc
 from sklearn.cross_validation import train_test_split
-from bayes_opt.bayesian_optimization import BayesianOptimization
 
 from MetaClassifier import MetaClassifier
 
@@ -406,8 +405,8 @@ def do_bayes_search(X, y, cv=3, testSize=0.3):
 		return pickle.load(open('bestParams.pickle', 'rb'))
 
 	print "Performing Bayesian search..."
+	from bayes_opt.bayesian_optimization import BayesianOptimization
 	import warnings
-	#from sklearn.metrics import roc_auc_score
 	warnings.filterwarnings("ignore")
 	def xgboostcv(
 		eta,

@@ -1,7 +1,7 @@
 
 import unittest, os
 import numpy as np
-import dill as pickle
+import cPickle as pickle
 from sklearn import datasets
 from sklearn.cross_validation import train_test_split
 from mlutils.MetaClassifier import MetaClassifier

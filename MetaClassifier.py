@@ -6,7 +6,7 @@ from sklearn.neighbors import KNeighborsClassifier
 from sklearn.ensemble import RandomForestClassifier
 from sklearn.ensemble import GradientBoostingClassifier
 from sklearn.ensemble import ExtraTreesClassifier
-from sklearn.neural_network import BernoulliRBM
+from sklearn.svm import SVC
 from sklearn.neural_network import MLPClassifier
 from sklearn.preprocessing import normalize
 from keras.wrappers.scikit_learn import KerasClassifier
@@ -67,6 +67,9 @@ class MetaClassifier(object):
 			predictions.append(probs*weight)
 		return np.sum(predictions, axis=0)
 
+	def setWeights(self, weights):
+		self.__weights = weights
+
 	def getEstimatorList(self):
 		return self.__estimators
 
@@ -78,22 +81,6 @@ class MetaClassifier(object):
 		if featImportance:
 			featImportance = np.mean(np.array(featImportance), axis=0)
 		return featImportance
-
-	def resetEstimatorList(self):
-		self.__estimators = list()
-
-	def applyPreproc(self, preproc, x):
-		if preproc == 'scale':
-			if self.__verbose: print "preproc: StandardScaler"
-			x_ = self.standardScaler.transform(x)
-			return x_.astype(np.float32)
-		if preproc:
-			if self.__verbose: print "preproc:", preproc
-			x_ = np.copy(x)
-			x_ = preproc(x_)
-			return x_.astype(np.float32)
-		else:
-			return x.astype(np.float32)
 
 	@staticmethod
 	def getDefaultParams():
@@ -126,6 +113,22 @@ class MetaClassifier(object):
 	def getParams(self):
 		return self.__params
 
+	def resetEstimatorList(self):
+		self.__estimators = list()
+
+	def applyPreproc(self, preproc, x):
+		if preproc == 'scale':
+			if self.__verbose: print "preproc: StandardScaler"
+			x_ = self.standardScaler.transform(x)
+			return x_.astype(np.float32)
+		if preproc:
+			if self.__verbose: print "preproc:", preproc
+			x_ = np.copy(x)
+			x_ = preproc(x_)
+			return x_.astype(np.float32)
+		else:
+			return x.astype(np.float32)
+
 	def addRFC(self, preproc=None, params={}):
 		name = 'RFC'
 		self.getEstimatorList().append((name, preproc, RandomForestClassifier(**params)))
@@ -150,13 +153,13 @@ class MetaClassifier(object):
 		name = 'KNC'
 		self.getEstimatorList().append((name, preproc, KNeighborsClassifier(**params)))
 
-	def addBRBM(self, preproc=None, params={}):
-		name = 'BRBM'
-		self.getEstimatorList().append((name, preproc, BernoulliRBM(**params)))
-
 	def addMLPC(self, preproc=None, params={}):
 		name = 'MLPC'
 		self.getEstimatorList().append((name, preproc, MLPClassifier(**params)))
+
+	def addSVC(self, preproc=None, params={}):
+		name = 'SVC'
+		self.getEstimatorList().append((name, preproc, SVC(**params)))
 
 	def addKNN(self, preproc=None, params={}):
 		name = 'KNN'

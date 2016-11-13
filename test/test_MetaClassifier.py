@@ -17,7 +17,7 @@ class MetaClassifierTest(unittest.TestCase):
 		iris = datasets.load_iris()
 		cls.Xtrain, cls.Xtest, cls.ytrain, cls.ytest = train_test_split(
 			iris.data, iris.target,
-			test_size=0.2,
+			test_size=0.3,
 			stratify=iris.target,
 			random_state=SEED
 		)
@@ -34,9 +34,7 @@ class MetaClassifierTest(unittest.TestCase):
 			Test basic classifier addition, fit, prediction.
 		"""
 		self.mcObj.addKNC(
-			params={
-				'n_jobs': -1
-			}
+			params={'n_jobs': -1}
 		)
 		self.mcObj.fit(self.Xtrain, self.ytrain)
 		self.assertEqual(len(self.mcObj.getEstimatorList()), 1)
@@ -55,26 +53,60 @@ class MetaClassifierTest(unittest.TestCase):
 		)
 		self.mcObj.addRFC(
 			preproc=np.log,
-			params={
-				'n_estimators': 200,
-			}
+			params={'n_estimators': 200}
 		)
+		self.mcObj.setWeights([0.8, 0.2])
+
 		self.mcObj.fit(self.Xtrain, self.ytrain)
-		self.assertEqual(round(get_auc(self.mcObj, self.Xtest, self.ytest), 2), 0.99)
 		self.assertEqual(len(self.mcObj.getEstimatorList()), 2)
+		self.assertEqual(round(get_auc(self.mcObj, self.Xtest, self.ytest), 2), 0.99)
 
 	def test3(self):
+		"""
+			Test weighting of each classifier
+		"""
+		self.mcObj.addLR(
+			params={}
+		)
+		self.mcObj.addLR(
+			params={'C':5000}
+		)
+		# No weights, is equal weighting
+		self.mcObj.setWeights([])
+		self.mcObj.fit(self.Xtrain, self.ytrain)
+		auc0 = get_auc(self.mcObj, self.Xtest, self.ytest)
+
+		# Weight first at 0.9, second at 0.1 (weights are normalized to 1.0)
+		self.mcObj.setWeights([0.9, 0.1])
+		self.mcObj.fit(self.Xtrain, self.ytrain)
+		auc1 = get_auc(self.mcObj, self.Xtest, self.ytest)
+
+		# Weight second at 0.9, first at 0.1
+		self.mcObj.setWeights([0.1, 0.9])
+		self.mcObj.fit(self.Xtrain, self.ytrain)
+		auc2 = get_auc(self.mcObj, self.Xtest, self.ytest)
+
+		#print auc0, auc1, auc2
+		self.assertNotEqual(auc0, auc1)
+		self.assertNotEqual(auc0, auc2)
+		self.assertNotEqual(auc1, auc2)
+
+	def test4(self):
 		"""
 			Test save, load
 		"""
 		self.mcObj.addKNC(
 			preproc='scale',
-			params={
-				'n_jobs': -1
-			}
+			params={'n_jobs': -1}
 		)
+		self.mcObj.addETC(
+			params={'n_jobs': -1}
+		)
+		self.mcObj.setWeights([0.8, 0.2])
+
 		outFile = '/tmp/test.pickle'
 		self.mcObj.fit(self.Xtrain, self.ytrain)
+		auc1 = get_auc(self.mcObj, self.Xtest, self.ytest)
 
 		# Save model
 		pickle.dump(self.mcObj, open(outFile, 'wb'))
@@ -82,7 +114,10 @@ class MetaClassifierTest(unittest.TestCase):
 
 		# Load model
 		self.mcObj = pickle.load(open(outFile, 'rb'))
-		self.assertEqual(round(get_auc(self.mcObj, self.Xtest, self.ytest), 2), 0.99)
+		auc2 = get_auc(self.mcObj, self.Xtest, self.ytest)
+
+		# Same result before and after saving/loading
+		self.assertEqual(auc1, auc2)
 
 
 if __name__ == '__main__':

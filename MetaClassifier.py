@@ -33,38 +33,40 @@ class MetaClassifierException(Exception):
 
 class MetaClassifier(object):
 
-	def __init__(self, weights=list()):
+	def __init__(self, weights=list(), verbose=False):
 		self.__estimators = list()
 		self.__weights = weights
+		self.__verbose = verbose
 		self.feature_importances_ = list()
 		self.standardScaler = StandardScaler()
-		
+
 	def fit(self, X, y):
 		X = X.astype(np.float32)
 		y = y.astype(np.int32)
-		
+
 		self.standardScaler.fit(X)
 
 		for name, preproc, est in self.__estimators:
+			if self.__verbose: print "Fitting estimator %s" % name
 			est.fit(self.applyPreproc(preproc, X), y)
 
 		self.getFeatureImportance()
-		
+
 	def predict_proba(self, x):
 		if not list(self.__weights):
 			self.__weights = np.ones(len(self.__estimators))
-		
+
 		if len(self.__weights) != len(self.__estimators):
 			raise MetaClassifierException("Number of weights to estimator mismatch!")
-		
+
 		predictions = list()
 		weights = self.__weights/np.sum(self.__weights)
-		
+
 		for (name, preproc, est), weight in zip(self.__estimators, weights):
 			probs = est.predict_proba(self.applyPreproc(preproc, x))
 			predictions.append(probs*weight)
 		return np.sum(predictions, axis=0)
-	
+
 	def getEstimatorList(self):
 		return self.__estimators
 
@@ -90,7 +92,7 @@ class MetaClassifier(object):
 			return x_.astype(np.float32)
 		else:
 			return x.astype(np.float32)
-	
+
 	@staticmethod
 	def getDefaultParams():
 		return {
@@ -121,11 +123,11 @@ class MetaClassifier(object):
 
 	def getParams(self):
 		return self.__params
-	
+
 	def addRFC(self, preproc=None, params={}):
 		name = 'RFC'
 		self.getEstimatorList().append((name, preproc, RandomForestClassifier(**params)))
-	
+
 	def addETC(self, preproc=None, params={}):
 		name = 'ETC'
 		self.getEstimatorList().append((name, preproc, ExtraTreesClassifier(**params)))
@@ -145,32 +147,32 @@ class MetaClassifier(object):
 	def addKNC(self, preproc=None, params={}):
 		name = 'KNC'
 		self.getEstimatorList().append((name, preproc, KNeighborsClassifier(**params)))
-	
+
 	def addBRBM(self, preproc=None, params={}):
 		name = 'BRBM'
 		self.getEstimatorList().append((name, preproc, BernoulliRBM(**params)))
-	
+
 	def addMLPC(self, preproc=None, params={}):
 		name = 'MLPC'
 		self.getEstimatorList().append((name, preproc, MLPClassifier(**params)))
-	
+
 	def addKNN(self, preproc=None, params={}):
 		name = 'KNN'
-		
+
 		est = KerasClassifier(
 			build_fn=params['build_fn'],
 			nb_epoch=params['nb_epoch'],
 			batch_size=64, #params['batch_size'],
 			verbose=0
 		)
-		
+
 		self.getEstimatorList().append((name, preproc, est))
 
 	def addLNN(self, preproc=None, params={}):
-		name = 'LNN'		
-		
+		name = 'LNN'
+
 		lasagne.random.set_rng(np.random.RandomState(SEED))
-		
+
 		layers = [
 			('input', InputLayer),
 			('dense0', DenseLayer),
@@ -201,7 +203,5 @@ class MetaClassifier(object):
 			max_epochs=params['max_epochs'],
 			verbose=1,
 		)
-		
+
 		self.getEstimatorList().append((name, preproc, est))
-	
-		

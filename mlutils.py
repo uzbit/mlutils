@@ -5,7 +5,7 @@ import matplotlib.pyplot as plt
 import cPickle as pickle
 import xgboost as xgb
 
-from sklearn.preprocessing import StandardScaler, LabelEncoder
+from sklearn.preprocessing import LabelEncoder
 from sklearn.metrics import confusion_matrix,  matthews_corrcoef, make_scorer, roc_curve, auc
 from sklearn.cross_validation import train_test_split
 from bayes_opt.bayesian_optimization import BayesianOptimization
@@ -157,7 +157,7 @@ def do_evo_search(X, y,
 	print bestParams
 	return bestParams
 
-def do_hyperopt_search(X, y, cv=3, testSize=0.2, seed=SEED):
+def do_hyperopt_search(X, y, cv=3, maxEvals=10, testSize=0.2, seed=SEED):
 	if os.path.exists('bestParams.pickle'):
 		return pickle.load(open('bestParams.pickle', 'rb'))
 
@@ -210,7 +210,7 @@ def do_hyperopt_search(X, y, cv=3, testSize=0.2, seed=SEED):
 	bestParams = fmin(score, space,
 		algo=tpe.suggest,
 		trials=trials,
-		max_evals=20
+		max_evals=maxEvals
 	)
 	for intChoice in intChoices:
 		bestParams[intChoice] = intChoices[intChoice][bestParams[intChoice]]
@@ -220,7 +220,7 @@ def do_hyperopt_search(X, y, cv=3, testSize=0.2, seed=SEED):
 	pickle.dump(bestParams, open('bestParams.pickle', 'wb'))
 	return bestParams
 
-def do_lnn_hyperopt_search(X, y, cv=3, testSize=0.2, seed=SEED):
+def do_lnn_hyperopt_search(X, y, cv=3, maxEvals=10, testSize=0.2, seed=SEED):
 
 	from hyperopt import hp
 	from hyperopt import fmin, tpe, hp, STATUS_OK, Trials
@@ -249,10 +249,6 @@ def do_lnn_hyperopt_search(X, y, cv=3, testSize=0.2, seed=SEED):
 	def score(params):
 		results = list()
 		print "Testing for ", params
-		standardScaler = StandardScaler()
-		def scalePreproc(X):
-			return standardScaler.transform(X)
-
 		params['input_shape'] = X.shape[1]
 		params['output_shape'] = 2
 		for param in intParams:
@@ -263,14 +259,13 @@ def do_lnn_hyperopt_search(X, y, cv=3, testSize=0.2, seed=SEED):
 				X, y, test_size=testSize, stratify=y, random_state=seed+i
 			)
 			print "Train shape", X_train.shape
-			standardScaler.fit(X_train)
 			mcObj = MetaClassifier()
 			mcObj.resetEstimatorList() # why is this fucking necessary?!
 			mcObj.addLNN(
-				preproc=scalePreproc,
+				preproc='scale',
 				params=params
 			)
-			mcObj.train(X_train, y_train)
+			mcObj.fit(X_train, y_train)
 			results.append(get_auc(mcObj, X_test, y_test))
 
 		print "Outcomes: ", results
@@ -282,7 +277,7 @@ def do_lnn_hyperopt_search(X, y, cv=3, testSize=0.2, seed=SEED):
 	bestParams = fmin(score, space,
 		algo=tpe.suggest,
 		trials=trials,
-		max_evals=20,
+		max_evals=maxEvals,
 		#rseed=None
 	)
 	for param in intParams:
@@ -297,7 +292,7 @@ def do_lnn_hyperopt_search(X, y, cv=3, testSize=0.2, seed=SEED):
 	return bestParams
 
 
-def do_knn_hyperopt_search(X, y, cv=3, testSize=0.2, seed=SEED):
+def do_knn_hyperopt_search(X, y, cv=3, maxEvals=10, testSize=0.2, seed=SEED):
 
 	from hyperopt import hp
 	from hyperopt import fmin, tpe, hp, STATUS_OK, Trials
@@ -332,9 +327,6 @@ def do_knn_hyperopt_search(X, y, cv=3, testSize=0.2, seed=SEED):
 	def score(params):
 		results = list()
 		print "Testing for ", params
-		standardScaler = StandardScaler()
-		def scalePreproc(X):
-			return standardScaler.transform(X)
 
 		def build_fn():
 			model = Sequential()
@@ -374,18 +366,17 @@ def do_knn_hyperopt_search(X, y, cv=3, testSize=0.2, seed=SEED):
 				X, y, test_size=testSize, stratify=y, random_state=seed+i
 			)
 			print "Train shape", X_train.shape
-			standardScaler.fit(X_train)
 			mcObj = MetaClassifier()
 			mcObj.resetEstimatorList() # why is this fucking necessary?!
 			mcObj.addKNN(
-				preproc=scalePreproc,
+				preproc='scale',
 				params={
 					'build_fn': build_fn,
 					'nb_epoch': int(params['nb_epoch']),
 					#'batch_size': int(params['batch_size']),
 				}
 			)
-			mcObj.train(X_train, y_train)
+			mcObj.fit(X_train, y_train)
 			results.append(get_auc(mcObj, X_test, y_test))
 
 		print "Outcomes: ", results
@@ -397,7 +388,7 @@ def do_knn_hyperopt_search(X, y, cv=3, testSize=0.2, seed=SEED):
 	bestParams = fmin(score, space,
 		algo=tpe.suggest,
 		trials=trials,
-		max_evals=20,
+		max_evals=maxEvals,
 	)
 	for param in intParams:
 		bestParams[param] = int(bestParams[param])

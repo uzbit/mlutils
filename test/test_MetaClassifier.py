@@ -45,7 +45,9 @@ class MetaClassifierTest(unittest.TestCase):
 	def test2(self):
 		"""
 			Test adding multiple classifiers, preprocessing functions,
-			parameter passing (params is passed to the classifier __init__)
+			parameter passing (params is passed to the classifier __init__).
+			preproc function is applied to each feature vector before training
+			and prediction. preproc='scale' is sklearn StandardScaler.
 		"""
 		self.mcObj.addKNC(
 			preproc='scale',
@@ -66,6 +68,7 @@ class MetaClassifierTest(unittest.TestCase):
 			Test save, load
 		"""
 		self.mcObj.addKNC(
+			preproc='scale',
 			params={
 				'n_jobs': -1
 			}
@@ -79,7 +82,7 @@ class MetaClassifierTest(unittest.TestCase):
 
 		# Load model
 		self.mcObj = pickle.load(open(outFile, 'rb'))
-		self.assertEqual(round(get_auc(self.mcObj, self.Xtest, self.ytest), 2), 1.0)
+		self.assertEqual(round(get_auc(self.mcObj, self.Xtest, self.ytest), 2), 0.99)
 
 
 if __name__ == '__main__':

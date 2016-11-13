@@ -11,74 +11,75 @@ SEED = 42
 
 class MetaClassifierTest(unittest.TestCase):
 
-	def setUp(self):
-		self.testPath = os.path.dirname(os.path.realpath(__file__))
+	@classmethod
+	def setUpClass(cls):
+		cls.testPath = os.path.dirname(os.path.realpath(__file__))
 		iris = datasets.load_iris()
-		self.Xtrain, self.Xtest, self.ytrain, self.ytest = train_test_split(
+		cls.Xtrain, cls.Xtest, cls.ytrain, cls.ytest = train_test_split(
 			iris.data, iris.target,
 			test_size=0.2,
 			stratify=iris.target,
 			random_state=SEED
 		)
-		self.Xtrain = self.Xtrain.astype(np.float32)
-		self.Xtest = self.Xtest.astype(np.float32)
-		self.ytrain = self.ytrain.astype(np.int32)
-		self.ytest = self.ytest.astype(np.int32)
+		cls.Xtrain = cls.Xtrain.astype(np.float32)
+		cls.Xtest = cls.Xtest.astype(np.float32)
+		cls.ytrain = cls.ytrain.astype(np.int32)
+		cls.ytest = cls.ytest.astype(np.int32)
+
+	def setUp(self):
+		self.mcObj = MetaClassifier(verbose=False)
 
 	def test1(self):
 		"""
 			Test basic classifier addition, fit, prediction.
 		"""
-		mcObj = MetaClassifier()
-		mcObj.addKNC(
+		self.mcObj.addKNC(
 			params={
 				'n_jobs': -1
 			}
 		)
-		mcObj.fit(self.Xtrain, self.ytrain)
-		self.assertEqual(len(mcObj.getEstimatorList()), 1)
-		self.assertEqual(round(get_auc(mcObj, self.Xtest, self.ytest), 2), 1.0)
+		self.mcObj.fit(self.Xtrain, self.ytrain)
+		self.assertEqual(len(self.mcObj.getEstimatorList()), 1)
+		self.assertEqual(round(get_auc(self.mcObj, self.Xtest, self.ytest), 2), 1.0)
 
 	def test2(self):
 		"""
 			Test adding multiple classifiers, preprocessing functions,
 			parameter passing (params is passed to the classifier __init__)
 		"""
-		mcObj = MetaClassifier(verbose=False)
-		mcObj.addKNC(
+		self.mcObj.addKNC(
 			preproc='scale',
 			params={'n_jobs': -1}
 		)
-		mcObj.addRFC(
+		self.mcObj.addRFC(
 			preproc=np.log,
 			params={
 				'n_estimators': 200,
 			}
 		)
-		mcObj.fit(self.Xtrain, self.ytrain)
-		self.assertEqual(round(get_auc(mcObj, self.Xtest, self.ytest), 2), 0.99)
-		self.assertEqual(len(mcObj.getEstimatorList()), 2)
+		self.mcObj.fit(self.Xtrain, self.ytrain)
+		self.assertEqual(round(get_auc(self.mcObj, self.Xtest, self.ytest), 2), 0.99)
+		self.assertEqual(len(self.mcObj.getEstimatorList()), 2)
 
 	def test3(self):
 		"""
 			Test save, load
 		"""
-		mcObj = MetaClassifier()
-		mcObj.addKNC(
+		self.mcObj.addKNC(
 			params={
 				'n_jobs': -1
 			}
 		)
 		outFile = '/tmp/test.pickle'
-		mcObj.fit(self.Xtrain, self.ytrain)
+		self.mcObj.fit(self.Xtrain, self.ytrain)
 
 		# Save model
-		pickle.dump(mcObj, open(outFile, 'wb'))
+		pickle.dump(self.mcObj, open(outFile, 'wb'))
 		self.assertTrue(os.path.exists(outFile))
 
 		# Load model
-		mcObj = pickle.load(open(outFile, 'rb'))
-		self.assertEqual(round(get_auc(mcObj, self.Xtest, self.ytest), 2), 1.0)
+		self.mcObj = pickle.load(open(outFile, 'rb'))
+		self.assertEqual(round(get_auc(self.mcObj, self.Xtest, self.ytest), 2), 1.0)
 
 
 if __name__ == '__main__':

@@ -73,9 +73,6 @@ class MetaClassifier(object):
 	def setWeights(self, weights):
 		self.__weights = weights
 
-	def getEstimatorList(self):
-		return self.__estimators
-
 	def getFeatureImportance(self):
 		featImportance = list()
 		for (name, preproc, est) in self.__estimators:
@@ -85,36 +82,8 @@ class MetaClassifier(object):
 			featImportance = np.mean(np.array(featImportance), axis=0)
 		return featImportance
 
-	@staticmethod
-	def getDefaultParams():
-		return {
-			'RFC': {'random_state': SEED},
-			'ETC': {'random_state': SEED},
-			'LR': {},
-			'GBC': {'random_state': SEED},
-			'XGBC': {'seed': SEED},
-			'MLP': {'random_state': SEED},
-			'KNC': {'n_jobs':-1},
-			'BRBM': {'random_state': SEED},
-			'MLPC': {'random_state': SEED},
-			'KNN': {},
-			'LNN': {
-				'dense0_num_units' : 1000,
-				'dense1_num_units' : 500,
-				'dense2_num_units' : 50,
-				'dropout0_p' : 0.4,
-				'dropout1_p' : 0.4,
-				'dropout2_p' : 0.4,
-				'max_epochs' : 40,
-				'input_shape' : 59,
-				'output_shape' : 2,
-				'update_learning_rate' : 0.001,
-				'train_split' : 0.2,
-			},
-		}
-
-	def getParams(self):
-		return self.__params
+	def getEstimatorList(self):
+		return self.__estimators
 
 	def resetEstimatorList(self):
 		self.__estimators = list()

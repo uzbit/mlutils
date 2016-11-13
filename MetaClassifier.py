@@ -84,9 +84,11 @@ class MetaClassifier(object):
 
 	def applyPreproc(self, preproc, x):
 		if preproc == 'scale':
+			if self.__verbose: print "preproc: StandardScaler"
 			x_ = self.standardScaler.transform(x)
 			return x_.astype(np.float32)
 		if preproc:
+			if self.__verbose: print "preproc:", preproc
 			x_ = np.copy(x)
 			x_ = preproc(x_)
 			return x_.astype(np.float32)

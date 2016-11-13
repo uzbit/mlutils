@@ -15,32 +15,71 @@ class MetaClassifierTest(unittest.TestCase):
 		self.testPath = os.path.dirname(os.path.realpath(__file__))
 		iris = datasets.load_iris()
 		self.Xtrain, self.Xtest, self.ytrain, self.ytest = train_test_split(
-			iris.data, iris.target, test_size=0.1, stratify=iris.target, random_state=SEED
+			iris.data, iris.target,
+			test_size=0.2,
+			stratify=iris.target,
+			random_state=SEED
 		)
 		self.Xtrain = self.Xtrain.astype(np.float32)
 		self.Xtest = self.Xtest.astype(np.float32)
 		self.ytrain = self.ytrain.astype(np.int32)
 		self.ytest = self.ytest.astype(np.int32)
-		
-		self.params = MetaClassifier.getDefaultParams()
 
 	def test1(self):
-		mcObj = MetaClassifier(self.params)
-		mcObj.addKNC()
+		"""
+			Test basic classifier addition, fit, prediction.
+		"""
+		mcObj = MetaClassifier()
+		mcObj.addKNC(
+			params={
+				'n_jobs': -1
+			}
+		)
 		mcObj.fit(self.Xtrain, self.ytrain)
-		
-		print "AUC Score: ", get_auc(mcObj, self.Xtest, self.ytest)
+		self.assertEqual(len(mcObj.getEstimatorList()), 1)
+		self.assertEqual(round(get_auc(mcObj, self.Xtest, self.ytest), 2), 1.0)
 
 	def test2(self):
-		mcObj = MetaClassifier(self.params)
-		mcObj.addKNC()
-		print len(mcObj.getEstimatorList())
-		
+		"""
+			Test adding multiple classifiers, preprocessing functions,
+			parameter passing (params is passed to the classifier __init__)
+		"""
+		mcObj = MetaClassifier(verbose=False)
+		mcObj.addKNC(
+			preproc='scale',
+			params={'n_jobs': -1}
+		)
+		mcObj.addRFC(
+			preproc=np.log,
+			params={
+				'n_estimators': 200,
+			}
+		)
+		mcObj.fit(self.Xtrain, self.ytrain)
+		self.assertEqual(round(get_auc(mcObj, self.Xtest, self.ytest), 2), 0.99)
+		self.assertEqual(len(mcObj.getEstimatorList()), 2)
+
 	def test3(self):
-		mcObj = MetaClassifier(self.params)
-		mcObj.addKNC()
-		print len(mcObj.getEstimatorList())
-		pickle.dump(mcObj, open('test.pickle', 'wb'))
+		"""
+			Test save, load
+		"""
+		mcObj = MetaClassifier()
+		mcObj.addKNC(
+			params={
+				'n_jobs': -1
+			}
+		)
+		outFile = '/tmp/test.pickle'
+		mcObj.fit(self.Xtrain, self.ytrain)
+
+		# Save model
+		pickle.dump(mcObj, open(outFile, 'wb'))
+		self.assertTrue(os.path.exists(outFile))
+
+		# Load model
+		mcObj = pickle.load(open(outFile, 'rb'))
+		self.assertEqual(round(get_auc(mcObj, self.Xtest, self.ytest), 2), 1.0)
+
 
 if __name__ == '__main__':
 	unittest.main()

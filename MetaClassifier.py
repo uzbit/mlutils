@@ -119,7 +119,7 @@ class MetaClassifier(object):
 
 	def addXGBC(self, preproc=None, params={}):
 		name = 'XGBC'
-		self.getEstimatorList().append((name, preproc, xgboost.XGBClassifier(**params)))
+		self.getEstimatorList().append((name, preproc, xgb.XGBClassifier(**params)))
 
 	def addKNC(self, preproc=None, params={}):
 		name = 'KNC'

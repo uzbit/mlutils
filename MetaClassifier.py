@@ -34,6 +34,13 @@ class MetaClassifierException(Exception):
 	def __str__(self):
 		return self.exception
 
+def _predict(cls, name, preproc, est, weight, x):
+	#cls, name, preproc, est, weight, x = _x
+	p = est.predict_proba(cls.applyPreproc(preproc, x))
+	r = weight*p
+	#print r
+	return r #weight*est.predict_proba(cls.applyPreproc(preproc, x))
+
 class MetaClassifier(object):
 
 	def __init__(self, weights=list(), verbose=False):
@@ -65,13 +72,33 @@ class MetaClassifier(object):
 		predictions = list()
 		weights = self.__weights/np.sum(self.__weights)
 
+		estList = list()
+		for (name, preproc, est), weight in zip(self.__estimators, weights):
+			estList.append((self, name, preproc, est, weight, x))
+
+		#from multiprocessing import Pool
+		#pool = Pool(len(self.__estimators))
+		#predictions.append(pool.map(_predict, estList))
+		# import pp
+		# server = pp.Server()
+		# jobList = list()
+		# for est in estList:
+		# 	jobList.append(server.submit(_predict, est))
+		#
+		# for job in jobList:
+		# 	predictions.append(job())
+
 		for (name, preproc, est), weight in zip(self.__estimators, weights):
 			probs = est.predict_proba(self.applyPreproc(preproc, x))
 			predictions.append(probs*weight)
+
 		return np.sum(predictions, axis=0)
 
 	def setWeights(self, weights):
 		self.__weights = weights
+
+	def setVerbose(self, verbose):
+		self.__verbose = verbose
 
 	def getFeatureImportance(self):
 		featImportance = list()

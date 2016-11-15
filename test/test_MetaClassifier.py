@@ -9,16 +9,17 @@ from mlutils.mlutils import get_auc
 
 SEED = 42
 
+
 class MetaClassifierTest(unittest.TestCase):
 
 	@classmethod
 	def setUpClass(cls):
 		cls.testPath = os.path.dirname(os.path.realpath(__file__))
-		iris = datasets.load_iris()
+		X, y = datasets.make_classification(n_samples=300)
 		cls.Xtrain, cls.Xtest, cls.ytrain, cls.ytest = train_test_split(
-			iris.data, iris.target,
+			X, y,
 			test_size=0.3,
-			stratify=iris.target,
+			stratify=y,
 			random_state=SEED
 		)
 		cls.Xtrain = cls.Xtrain.astype(np.float32)
@@ -38,7 +39,7 @@ class MetaClassifierTest(unittest.TestCase):
 		)
 		self.mcObj.fit(self.Xtrain, self.ytrain)
 		self.assertEqual(len(self.mcObj.getEstimatorList()), 1)
-		self.assertEqual(round(get_auc(self.mcObj, self.Xtest, self.ytest), 2), 1.0)
+		self.assertEqual(round(get_auc(self.mcObj, self.Xtest, self.ytest), 2), 0.98)
 
 	def test2(self):
 		"""
@@ -52,14 +53,14 @@ class MetaClassifierTest(unittest.TestCase):
 			params={'n_jobs': -1}
 		)
 		self.mcObj.addRFC(
-			preproc=np.log,
+			preproc=lambda x: x**2,
 			params={'n_estimators': 200}
 		)
 		self.mcObj.setWeights([0.8, 0.2])
 
 		self.mcObj.fit(self.Xtrain, self.ytrain)
 		self.assertEqual(len(self.mcObj.getEstimatorList()), 2)
-		self.assertEqual(round(get_auc(self.mcObj, self.Xtest, self.ytest), 2), 0.99)
+		self.assertEqual(round(get_auc(self.mcObj, self.Xtest, self.ytest), 2), 0.98)
 
 	def test3(self):
 		"""

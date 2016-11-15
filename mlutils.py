@@ -579,8 +579,6 @@ def get_confusion_rates(label, preds, labels=None):
 
 def get_auc(clf, X_test, y_test):
 	probs = clf.predict_proba(X_test)[:,1]
-	#for p, y in zip(probs, y_test):
-	#	print p, y
 	fpr, tpr, _ = roc_curve(y_test, probs, pos_label=1)
 	thisAUC = auc(fpr, tpr)
 	return thisAUC

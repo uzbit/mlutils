@@ -1,8 +1,8 @@
-import xgboost as xgb
 import numpy as np
+from joblib import Parallel, delayed
 
-from sknn.platform import gpu32
 from sklearn.preprocessing import StandardScaler
+from sklearn.preprocessing import LabelBinarizer
 from sklearn.linear_model import LogisticRegression
 from sklearn.neighbors import KNeighborsClassifier
 from sklearn.ensemble import RandomForestClassifier
@@ -12,28 +12,42 @@ from sklearn.svm import SVC
 from sklearn.neural_network import MLPClassifier
 from sklearn.preprocessing import normalize
 
-from keras.wrappers.scikit_learn import KerasClassifier
-from keras.models import Sequential
+try:
+	import xgboost as xgb
+except ImportError:
+	pass
 
-import lasagne
-from lasagne.layers import DenseLayer
-from lasagne.layers import InputLayer
-from lasagne.layers import DropoutLayer
-from lasagne.updates import adagrad, nesterov_momentum
-from lasagne.nonlinearities import softmax, tanh
-from lasagne.objectives import binary_crossentropy
-from nolearn.lasagne import NeuralNet
-from nolearn.lasagne import TrainSplit
+try:
+	from sknn.platform import gpu32
+except ImportError:
+	pass
 
-from joblib import Parallel, delayed
+try:
+	from keras.wrappers.scikit_learn import KerasClassifier
+	from keras.models import Sequential
+except ImportError:
+	pass
+
+try:
+	import lasagne
+	from lasagne.layers import DenseLayer
+	from lasagne.layers import InputLayer
+	from lasagne.layers import DropoutLayer
+	from lasagne.updates import adagrad, nesterov_momentum
+	from lasagne.nonlinearities import softmax, tanh
+	from lasagne.objectives import binary_crossentropy
+	from nolearn.lasagne import NeuralNet
+	from nolearn.lasagne import TrainSplit
+except ImportError:
+	pass
 
 SEED = 42
 np.random.seed(SEED)
 
 def _predict_proba(cls, preproc, est, weight, x):
-	p = est.predict_proba(cls.applyPreproc(preproc, x))
-	r = weight*p
-	return r
+	proba = est.predict_proba(cls.applyPreproc(preproc, x))
+	result = weight*proba
+	return result
 
 class MetaClassifierException(Exception):
 	def __init__(self, e):
@@ -51,6 +65,9 @@ class MetaClassifier(object):
 		self.__verbose = verbose
 
 		self.feature_importances_ = list()
+		self.classes_ = list()
+
+		self.labelBinarizer = LabelBinarizer()
 		self.standardScaler = StandardScaler()
 
 	def fit(self, X, y):
@@ -58,12 +75,18 @@ class MetaClassifier(object):
 		y = y.astype(np.int32)
 
 		self.standardScaler.fit(X)
+		self.labelBinarizer.fit(y)
 
 		for name, preproc, est in self.__estimators:
 			if self.__verbose: print "Fitting estimator %s" % name
 			est.fit(self.applyPreproc(preproc, X), y)
 
 		self.getFeatureImportance()
+
+	def predict(self, x):
+		probas = self.predict_proba(x)
+		indices = probas.argmax(axis=1)
+		return self.classes_[indices]
 
 	def predict_proba(self, x):
 		if not list(self.__weights):

@@ -1,9 +1,7 @@
 import os
 import random
 import numpy as np
-import matplotlib.pyplot as plt
 import cPickle as pickle
-import xgboost as xgb
 
 from sklearn.preprocessing import LabelEncoder
 from sklearn.metrics import confusion_matrix,  matthews_corrcoef, make_scorer, roc_curve, auc
@@ -15,6 +13,7 @@ LOGIT_ACCEPT_RATE = 0.5
 SEED = 42
 
 def plot_hist(y1, y2 = None, binFactor=50.0, title=''):
+	import matplotlib.pyplot as plt
 	thisMax = max(y1)
 	thisMin = min(y1)
 	if y2 is not None:
@@ -36,6 +35,7 @@ def plot_hist(y1, y2 = None, binFactor=50.0, title=''):
 	plt.show()
 
 def plot_importance(clf, columns):
+	import matplotlib.pyplot as plt
 	feature_importance = clf.feature_importances_
 	# make importances relative to max importance
 	feature_importance = 100.0 * (feature_importance / feature_importance.max())
@@ -50,6 +50,7 @@ def plot_importance(clf, columns):
 	plt.show()
 
 def plot_deviance(clf, X, y, n_estimators):
+	import matplotlib.pyplot as plt
 	offset = int(X.shape[0] * 0.9)
 	X_train, y_train = X[:offset], y[:offset]
 	X_test, y_test = X[offset:], y[offset:]
@@ -102,7 +103,8 @@ def do_evo_search(X, y,
 	population_size=50, mutation_prob=0.3, #crossover_prob=0.5,
 	generations_number=20, n_jobs=4,
 	gridpickle='bestParams.pickle'):
-	print "Performing evolutionary search..."
+	print "Performing evolutionary XGBoost search..."
+	import xgboost as xgb
 	from evolutionary_search import EvolutionaryAlgorithmSearchCV
 	from sklearn.pipeline import Pipeline
 	X_train, X_test, y_train, y_test = train_test_split(X, y, test_size=0.5, stratify=y, random_state=SEED)
@@ -156,10 +158,11 @@ def do_evo_search(X, y,
 	print bestParams
 	return bestParams
 
-def do_hyperopt_search(X, y, cv=3, maxEvals=10, testSize=0.2, seed=SEED):
+def do_xgboost_hyperopt_search(X, y, cv=3, maxEvals=10, testSize=0.2, seed=SEED):
 	if os.path.exists('bestParams.pickle'):
 		return pickle.load(open('bestParams.pickle', 'rb'))
 
+	import xgboost as xgb
 	from hyperopt import hp
 	from hyperopt import fmin, tpe, hp, STATUS_OK, Trials
 

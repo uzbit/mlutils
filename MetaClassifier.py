@@ -25,8 +25,15 @@ from lasagne.objectives import binary_crossentropy
 from nolearn.lasagne import NeuralNet
 from nolearn.lasagne import TrainSplit
 
+from joblib import Parallel, delayed
+
 SEED = 42
 np.random.seed(SEED)
+
+def _predict_proba(cls, preproc, est, weight, x):
+	p = est.predict_proba(cls.applyPreproc(preproc, x))
+	r = weight*p
+	return r
 
 class MetaClassifierException(Exception):
 	def __init__(self, e):
@@ -34,19 +41,15 @@ class MetaClassifierException(Exception):
 	def __str__(self):
 		return self.exception
 
-def _predict(cls, name, preproc, est, weight, x):
-	#cls, name, preproc, est, weight, x = _x
-	p = est.predict_proba(cls.applyPreproc(preproc, x))
-	r = weight*p
-	#print r
-	return r #weight*est.predict_proba(cls.applyPreproc(preproc, x))
 
 class MetaClassifier(object):
 
-	def __init__(self, weights=list(), verbose=False):
+	def __init__(self, weights=list(), parallel=True, verbose=False):
 		self.__estimators = list()
 		self.__weights = weights
+		self.__parallel = parallel
 		self.__verbose = verbose
+
 		self.feature_importances_ = list()
 		self.standardScaler = StandardScaler()
 
@@ -72,25 +75,19 @@ class MetaClassifier(object):
 		predictions = list()
 		weights = self.__weights/np.sum(self.__weights)
 
-		estList = list()
-		for (name, preproc, est), weight in zip(self.__estimators, weights):
-			estList.append((self, name, preproc, est, weight, x))
+		if self.__parallel:
+			estList = list()
+			for (name, preproc, est), weight in zip(self.__estimators, weights):
+				estList.append((self, preproc, est, weight, x))
 
-		#from multiprocessing import Pool
-		#pool = Pool(len(self.__estimators))
-		#predictions.append(pool.map(_predict, estList))
-		# import pp
-		# server = pp.Server()
-		# jobList = list()
-		# for est in estList:
-		# 	jobList.append(server.submit(_predict, est))
-		#
-		# for job in jobList:
-		# 	predictions.append(job())
-
-		for (name, preproc, est), weight in zip(self.__estimators, weights):
-			probs = est.predict_proba(self.applyPreproc(preproc, x))
-			predictions.append(probs*weight)
+			with Parallel(n_jobs=len(self.__estimators), backend="threading") as parallel:
+				predictions += parallel(
+					delayed(_predict_proba)(*job) for job in estList
+				)
+		else:
+			for (name, preproc, est), weight in zip(self.__estimators, weights):
+				probs = est.predict_proba(self.applyPreproc(preproc, x))
+				predictions.append(probs*weight)
 
 		return np.sum(predictions, axis=0)
 

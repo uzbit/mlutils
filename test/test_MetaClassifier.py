@@ -15,7 +15,7 @@ class MetaClassifierTest(unittest.TestCase):
 	@classmethod
 	def setUpClass(cls):
 		cls.testPath = os.path.dirname(os.path.realpath(__file__))
-		X, y = datasets.make_classification(n_samples=300)
+		X, y = datasets.make_classification(n_samples=1000)
 		cls.Xtrain, cls.Xtest, cls.ytrain, cls.ytest = train_test_split(
 			X, y,
 			test_size=0.3,
@@ -39,7 +39,7 @@ class MetaClassifierTest(unittest.TestCase):
 		)
 		self.mcObj.fit(self.Xtrain, self.ytrain)
 		self.assertEqual(len(self.mcObj.getEstimatorList()), 1)
-		self.assertEqual(round(get_auc(self.mcObj, self.Xtest, self.ytest), 2), 0.98)
+		self.assertEqual(round(get_auc(self.mcObj, self.Xtest, self.ytest), 2), 0.89)
 
 	def test2(self):
 		"""
@@ -53,14 +53,17 @@ class MetaClassifierTest(unittest.TestCase):
 			params={'n_jobs': -1}
 		)
 		self.mcObj.addRFC(
-			preproc=lambda x: x**2,
-			params={'n_estimators': 200}
+			preproc=np.abs, #lambda x: x**2,
+			params={
+				'n_estimators': 100,
+				'n_jobs': -1,
+			}
 		)
 		self.mcObj.setWeights([0.8, 0.2])
 
 		self.mcObj.fit(self.Xtrain, self.ytrain)
 		self.assertEqual(len(self.mcObj.getEstimatorList()), 2)
-		self.assertEqual(round(get_auc(self.mcObj, self.Xtest, self.ytest), 2), 0.98)
+		self.assertEqual(round(get_auc(self.mcObj, self.Xtest, self.ytest), 2), 0.88)
 
 	def test3(self):
 		"""
@@ -70,20 +73,34 @@ class MetaClassifierTest(unittest.TestCase):
 			params={}
 		)
 		self.mcObj.addLR(
-			params={'C':5000}
+			params={'C':10000}
 		)
+		self.mcObj.addKNC(
+			params={'n_jobs': -1}
+		)
+		self.mcObj.addRFC(
+			preproc=np.abs, #lambda x: x**2,
+			params={
+				'n_estimators': 100,
+				'n_jobs': -1,
+			}
+		)
+		numEst = len(self.mcObj.getEstimatorList())
+		weights = np.ones(numEst)/float(numEst)
+
 		# No weights, is equal weighting
 		self.mcObj.setWeights([])
 		self.mcObj.fit(self.Xtrain, self.ytrain)
 		auc0 = get_auc(self.mcObj, self.Xtest, self.ytest)
 
-		# Weight first at 0.9, second at 0.1 (weights are normalized to 1.0)
-		self.mcObj.setWeights([0.9, 0.1])
+		weights[0] *= 2.
+		self.mcObj.setWeights(weights)
 		self.mcObj.fit(self.Xtrain, self.ytrain)
 		auc1 = get_auc(self.mcObj, self.Xtest, self.ytest)
 
-		# Weight second at 0.9, first at 0.1
-		self.mcObj.setWeights([0.1, 0.9])
+		weights[0] /= 2.
+		weights[-1] *= 2.
+		self.mcObj.setWeights(weights)
 		self.mcObj.fit(self.Xtrain, self.ytrain)
 		auc2 = get_auc(self.mcObj, self.Xtest, self.ytest)
 

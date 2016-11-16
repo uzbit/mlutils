@@ -44,7 +44,7 @@ class MetaClassifierException(Exception):
 
 class MetaClassifier(object):
 
-	def __init__(self, weights=list(), parallel=True, verbose=False):
+	def __init__(self, weights=list(), parallel=False, verbose=False):
 		self.__estimators = list()
 		self.__weights = weights
 		self.__parallel = parallel

@@ -61,7 +61,7 @@ class MetaClassifier(object):
 	def __init__(self, weights=list(), parallel=False, verbose=False):
 		self.__estimators = list()
 		self.__weights = weights
-		self.__parallel = parallel
+		self.__parallel = False #parallel
 		self.__verbose = verbose
 
 		self.feature_importances_ = list()
@@ -93,7 +93,9 @@ class MetaClassifier(object):
 			self.__weights = np.ones(len(self.__estimators))
 
 		if len(self.__weights) != len(self.__estimators):
-			raise MetaClassifierException("Number of weights to estimator mismatch!")
+			raise MetaClassifierException(
+				"Number of weights (%d) to estimator (%d) mismatch!" % (len(self.__weights), len(self.__estimators))
+			)
 
 		predictions = list()
 		weights = self.__weights/np.sum(self.__weights)
@@ -186,7 +188,7 @@ class MetaClassifier(object):
 		est = KerasClassifier(
 			build_fn=params['build_fn'],
 			nb_epoch=params['nb_epoch'],
-			batch_size=64, #params['batch_size'],
+			batch_size=params['batch_size'],
 			verbose=0
 		)
 

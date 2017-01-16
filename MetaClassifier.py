@@ -10,7 +10,6 @@ from sklearn.ensemble import GradientBoostingClassifier
 from sklearn.ensemble import ExtraTreesClassifier
 from sklearn.svm import SVC
 from sklearn.neural_network import MLPClassifier
-from sklearn.preprocessing import normalize
 
 try:
 	import xgboost as xgb
@@ -65,7 +64,6 @@ class MetaClassifier(object):
 		self.__verbose = verbose
 
 		self.feature_importances_ = list()
-		self.classes_ = list()
 
 		self.labelBinarizer = LabelBinarizer()
 		self.standardScaler = StandardScaler()
@@ -86,7 +84,7 @@ class MetaClassifier(object):
 	def predict(self, x):
 		probas = self.predict_proba(x)
 		indices = probas.argmax(axis=1)
-		return self.classes_[indices]
+		return self.labelBinarizer.classes_[indices]
 
 	def predict_proba(self, x):
 		if not list(self.__weights):
@@ -99,6 +97,7 @@ class MetaClassifier(object):
 		weights = self.__weights/np.sum(self.__weights)
 
 		if self.__parallel:
+			from joblib import Parallel, delayed
 			estList = list()
 			for (name, preproc, est), weight in zip(self.__estimators, weights):
 				estList.append((self, preproc, est, weight, x))
@@ -121,13 +120,13 @@ class MetaClassifier(object):
 		self.__verbose = verbose
 
 	def getFeatureImportance(self):
-		featImportance = list()
+		self.feature_importances_ = list()
 		for (name, preproc, est) in self.__estimators:
 			if hasattr(est, 'feature_importances_'):
-				featImportance.append(est.feature_importances_)
-		if featImportance:
-			featImportance = np.mean(np.array(featImportance), axis=0)
-		return featImportance
+				self.feature_importances_.append(est.feature_importances_)
+		if self.feature_importances_:
+			self.feature_importances_ = np.mean(np.array(self.feature_importances_), axis=0)
+		return self.feature_importances_
 
 	def getEstimatorList(self):
 		return self.__estimators

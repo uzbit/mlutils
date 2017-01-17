@@ -1,5 +1,4 @@
 import numpy as np
-from joblib import Parallel, delayed
 
 from sklearn.preprocessing import StandardScaler
 from sklearn.preprocessing import LabelBinarizer
@@ -8,6 +7,7 @@ from sklearn.neighbors import KNeighborsClassifier
 from sklearn.ensemble import RandomForestClassifier
 from sklearn.ensemble import GradientBoostingClassifier
 from sklearn.ensemble import ExtraTreesClassifier
+from sklearn.ensemble import AdaBoostClassifier
 from sklearn.svm import SVC
 from sklearn.neural_network import MLPClassifier
 
@@ -64,6 +64,7 @@ class MetaClassifier(object):
 		self.__verbose = verbose
 
 		self.feature_importances_ = list()
+		self.classes_ = list()
 
 		self.labelBinarizer = LabelBinarizer()
 		self.standardScaler = StandardScaler()
@@ -74,7 +75,8 @@ class MetaClassifier(object):
 
 		self.standardScaler.fit(X)
 		self.labelBinarizer.fit(y)
-
+		self.classes_ = self.labelBinarizer.classes_
+		
 		for name, preproc, est in self.__estimators:
 			if self.__verbose: print "Fitting estimator %s" % name
 			est.fit(self.applyPreproc(preproc, X), y)
@@ -146,6 +148,10 @@ class MetaClassifier(object):
 			return x_.astype(np.float32)
 		else:
 			return x.astype(np.float32)
+
+	def addABC(self, preproc=None, params={}):
+		name = 'ABC'
+		self.getEstimatorList().append((name, preproc, AdaBoostClassifier(**params)))
 
 	def addRFC(self, preproc=None, params={}):
 		name = 'RFC'

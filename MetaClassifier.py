@@ -1,5 +1,7 @@
 import numpy as np
 
+from sklearn.base import BaseEstimator
+from sklearn.base import ClassifierMixin
 from sklearn.preprocessing import StandardScaler
 from sklearn.preprocessing import LabelBinarizer
 from sklearn.linear_model import LogisticRegression
@@ -10,6 +12,11 @@ from sklearn.ensemble import ExtraTreesClassifier
 from sklearn.ensemble import AdaBoostClassifier
 from sklearn.svm import SVC
 from sklearn.neural_network import MLPClassifier
+
+try:
+	from treeinterpreter import treeinterpreter as ti
+except ImportError:
+	pass
 
 try:
 	import xgboost as xgb
@@ -55,9 +62,15 @@ class MetaClassifierException(Exception):
 		return self.exception
 
 
-class MetaClassifier(object):
+class MetaClassifier(BaseEstimator, ClassifierMixin):
 
-	def __init__(self, weights=list(), parallel=False, verbose=False):
+	VALID_INTERP_ALGOS = [
+		'RFC',
+		'GBC'
+	]
+
+	def __init__(self, weights=[], parallel=False, verbose=False):
+		super(self.__class__, self).__init__()
 		self.__estimators = list()
 		self.__weights = weights
 		self.__parallel = parallel
@@ -76,7 +89,7 @@ class MetaClassifier(object):
 		self.standardScaler.fit(X)
 		self.labelBinarizer.fit(y)
 		self.classes_ = self.labelBinarizer.classes_
-		
+
 		for name, preproc, est in self.__estimators:
 			if self.__verbose: print "Fitting estimator %s" % name
 			est.fit(self.applyPreproc(preproc, X), y)
@@ -89,7 +102,7 @@ class MetaClassifier(object):
 		return self.labelBinarizer.classes_[indices]
 
 	def predict_proba(self, x):
-		if not list(self.__weights):
+		if self.__weights is None or not list(self.__weights):
 			self.__weights = np.ones(len(self.__estimators))
 
 		if len(self.__weights) != len(self.__estimators):
@@ -111,6 +124,7 @@ class MetaClassifier(object):
 		else:
 			for (name, preproc, est), weight in zip(self.__estimators, weights):
 				probs = est.predict_proba(self.applyPreproc(preproc, x))
+
 				predictions.append(probs*weight)
 
 		return np.sum(predictions, axis=0)
@@ -130,6 +144,22 @@ class MetaClassifier(object):
 			self.feature_importances_ = np.mean(np.array(self.feature_importances_), axis=0)
 		return self.feature_importances_
 
+	def getTreeInterpretation(self, x):
+		estList = self.getEstimatorList()
+		prediction, bias, contributions = list(), list(), list()
+		for (name, preproc, est) in estList:
+			if name in MetaClassifier.VALID_INTERP_ALGOS:
+				_x = self.applyPreproc(preproc, x)
+				p, b, c = ti.predict(est, _x)
+				prediction.append(p)
+				bias.append(b)
+				contributions.append(c)
+
+		prediction = np.mean(np.array(prediction), axis=0)
+		bias = np.mean(np.array(bias), axis=0)
+		contributions = np.mean(np.array(contributions), axis=0)
+		return prediction, bias, contributions
+
 	def getEstimatorList(self):
 		return self.__estimators
 
@@ -137,6 +167,9 @@ class MetaClassifier(object):
 		self.__estimators = list()
 
 	def applyPreproc(self, preproc, x):
+		if type(x) is not np.array:
+			x = np.array(x)
+
 		if preproc == 'scale':
 			if self.__verbose: print "preproc: StandardScaler"
 			x_ = self.standardScaler.transform(x)

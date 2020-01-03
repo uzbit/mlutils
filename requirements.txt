@@ -11,7 +11,7 @@ pkg-resources==0.0.0
 pyparsing==2.1.10
 python-dateutil==2.6.0
 pytz==2016.7
-PyYAML==3.12
+PyYAML==5.1
 scikit-learn==0.18
 scikit-neuralnetwork==0.7
 scipy==0.18.1

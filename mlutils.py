@@ -1,13 +1,13 @@
 import os
 import random
 import numpy as np
-import cPickle as pickle
+import pickle as pickle
 
 from sklearn.preprocessing import LabelEncoder
 from sklearn.metrics import confusion_matrix,  matthews_corrcoef, make_scorer, roc_curve, auc
-from sklearn.cross_validation import train_test_split
+from sklearn.model_selection import train_test_split
 
-from MetaClassifier import MetaClassifier
+from .MetaClassifier import MetaClassifier
 
 LOGIT_ACCEPT_RATE = 0.5
 SEED = 42
@@ -28,7 +28,7 @@ def plot_hist(y1, y2 = None, binFactor=50.0, title=''):
 		if y2 is not None:
 			plt.hist(y2, alpha = 0.5, bins=np.arange(thisMin, thisMax + thisWidth,  thisWidth), label='y2')
 	except IndexError:
-		print title, 'had no values!'
+		print(title, 'had no values!')
 
 	plt.title(title)
 	plt.legend()
@@ -103,12 +103,12 @@ def do_evo_search(X, y,
 	population_size=50, mutation_prob=0.3, #crossover_prob=0.5,
 	generations_number=20, n_jobs=4,
 	gridpickle='bestParams.pickle'):
-	print "Performing evolutionary XGBoost search..."
+	print("Performing evolutionary XGBoost search...")
 	import xgboost as xgb
 	from evolutionary_search import EvolutionaryAlgorithmSearchCV
 	from sklearn.pipeline import Pipeline
 	X_train, X_test, y_train, y_test = train_test_split(X, y, test_size=0.5, stratify=y, random_state=SEED)
-	print "Training on ", X_test.shape
+	print("Training on ", X_test.shape)
 
 	if not grid:
 		grid = dict()
@@ -150,12 +150,12 @@ def do_evo_search(X, y,
 		bestParams = pickle.load(open(gridpickle, 'rb'))
 	else:
 		clf.fit(X_test, y_test)
-		print "Best score", clf.best_score_
-		print "Best params", clf.best_params_
+		print("Best score", clf.best_score_)
+		print("Best params", clf.best_params_)
 		bestParams = {x.split('__')[1]:clf.best_params_[x] for x in clf.best_params_ if x.split('__')[0] == 'xgb'}
 		pickle.dump(bestParams, open(gridpickle, 'wb'))
 
-	print bestParams
+	print(bestParams)
 	return bestParams
 
 def do_xgboost_hyperopt_search(X, y, cv=3, maxEvals=10, testSize=0.2, seed=SEED):
@@ -166,7 +166,7 @@ def do_xgboost_hyperopt_search(X, y, cv=3, maxEvals=10, testSize=0.2, seed=SEED)
 	from hyperopt import hp
 	from hyperopt import fmin, tpe, hp, STATUS_OK, Trials
 
-	print "Performing hyperopt search..."
+	print("Performing hyperopt search...")
 	intChoices = {
 		'n_estimators': np.arange(300, 10000, dtype=int),
 		'max_depth': np.arange(3, 100, dtype=int),
@@ -187,12 +187,12 @@ def do_xgboost_hyperopt_search(X, y, cv=3, maxEvals=10, testSize=0.2, seed=SEED)
 
 	def score(params):
 		results = list()
-		print "Testing for ", params
-		for i in xrange(cv):
+		print("Testing for ", params)
+		for i in range(cv):
 			X_train, X_test, y_train, y_test = train_test_split(
 				X, y, test_size=testSize, stratify=y, random_state=seed+i
 			)
-			print "Train shape", X_train.shape
+			print("Train shape", X_train.shape)
 			clf = xgb.XGBClassifier(**params)
 			clf.fit(X_train, y_train,
 				eval_set=[(X_train, y_train), (X_test, y_test)],
@@ -203,9 +203,9 @@ def do_xgboost_hyperopt_search(X, y, cv=3, maxEvals=10, testSize=0.2, seed=SEED)
 			fpr, tpr, _ = roc_curve(y_test, probs, pos_label=1)
 			results.append(auc(fpr, tpr))
 
-		print "Outcomes: ", results
-		print "This score:", 1.0-np.mean(results)
-		print
+		print("Outcomes: ", results)
+		print("This score:", 1.0-np.mean(results))
+		print()
 		return {'loss': 1.0-np.mean(results), 'status': STATUS_OK}
 
 	trials = Trials()
@@ -217,7 +217,7 @@ def do_xgboost_hyperopt_search(X, y, cv=3, maxEvals=10, testSize=0.2, seed=SEED)
 	for intChoice in intChoices:
 		bestParams[intChoice] = intChoices[intChoice][bestParams[intChoice]]
 
-	print "Saving the best parameters: ", bestParams
+	print("Saving the best parameters: ", bestParams)
 
 	pickle.dump(bestParams, open('bestParams.pickle', 'wb'))
 	return bestParams
@@ -227,7 +227,7 @@ def do_lnn_hyperopt_search(X, y, cv=3, maxEvals=10, testSize=0.2, seed=SEED):
 	from hyperopt import hp
 	from hyperopt import fmin, tpe, hp, STATUS_OK, Trials
 
-	print "Performing LNN hyperopt search..."
+	print("Performing LNN hyperopt search...")
 
 	intParams = [
 		'dense0_num_units',
@@ -250,17 +250,17 @@ def do_lnn_hyperopt_search(X, y, cv=3, maxEvals=10, testSize=0.2, seed=SEED):
 
 	def score(params):
 		results = list()
-		print "Testing for ", params
+		print("Testing for ", params)
 		params['input_shape'] = X.shape[1]
 		params['output_shape'] = 2
 		for param in intParams:
 			params[param] = int(params[param])
 
-		for i in xrange(cv):
+		for i in range(cv):
 			X_train, X_test, y_train, y_test = train_test_split(
 				X, y, test_size=testSize, stratify=y, random_state=seed+i
 			)
-			print "Train shape", X_train.shape
+			print("Train shape", X_train.shape)
 			mcObj = MetaClassifier()
 			mcObj.resetEstimatorList() # why is this fucking necessary?!
 			mcObj.addLNN(
@@ -270,9 +270,9 @@ def do_lnn_hyperopt_search(X, y, cv=3, maxEvals=10, testSize=0.2, seed=SEED):
 			mcObj.fit(X_train, y_train)
 			results.append(get_auc(mcObj, X_test, y_test))
 
-		print "Outcomes: ", results
-		print "This score:", 1.0-np.mean(results)
-		print
+		print("Outcomes: ", results)
+		print("This score:", 1.0-np.mean(results))
+		print()
 		return {'loss': 1.0-np.mean(results), 'status': STATUS_OK}
 
 	trials = Trials()
@@ -288,7 +288,7 @@ def do_lnn_hyperopt_search(X, y, cv=3, maxEvals=10, testSize=0.2, seed=SEED):
 	bestParams['input_shape'] = X.shape[1]
 	bestParams['output_shape'] = 2
 
-	print "Saving the best parameters: ", bestParams
+	print("Saving the best parameters: ", bestParams)
 
 	pickle.dump(bestParams, open('bestParams_lnn.pickle', 'wb'))
 	return bestParams
@@ -304,7 +304,7 @@ def do_knn_hyperopt_search(X, y, cv=3, maxEvals=10, testSize=0.2, seed=SEED):
 	from keras.layers.local import LocallyConnected1D
 	from keras.optimizers import SGD
 
-	print "Performing KNN hyperopt search..."
+	print("Performing KNN hyperopt search...")
 
 	intParams = [
 		'dense0_num_units',
@@ -328,7 +328,7 @@ def do_knn_hyperopt_search(X, y, cv=3, maxEvals=10, testSize=0.2, seed=SEED):
 
 	def score(params):
 		results = list()
-		print "Testing for ", params
+		print("Testing for ", params)
 
 		def build_fn():
 			model = Sequential()
@@ -363,11 +363,11 @@ def do_knn_hyperopt_search(X, y, cv=3, maxEvals=10, testSize=0.2, seed=SEED):
 		for param in intParams:
 			params[param] = int(params[param])
 
-		for i in xrange(cv):
+		for i in range(cv):
 			X_train, X_test, y_train, y_test = train_test_split(
 				X, y, test_size=testSize, stratify=y, random_state=seed+i
 			)
-			print "Train shape", X_train.shape
+			print("Train shape", X_train.shape)
 			mcObj = MetaClassifier()
 			mcObj.resetEstimatorList() # why is this fucking necessary?!
 			mcObj.addKNN(
@@ -381,9 +381,9 @@ def do_knn_hyperopt_search(X, y, cv=3, maxEvals=10, testSize=0.2, seed=SEED):
 			mcObj.fit(X_train, y_train)
 			results.append(get_auc(mcObj, X_test, y_test))
 
-		print "Outcomes: ", results
-		print "This score:", 1.0-np.mean(results)
-		print
+		print("Outcomes: ", results)
+		print("This score:", 1.0-np.mean(results))
+		print()
 		return {'loss': 1.0-np.mean(results), 'status': STATUS_OK}
 
 	trials = Trials()
@@ -398,7 +398,7 @@ def do_knn_hyperopt_search(X, y, cv=3, maxEvals=10, testSize=0.2, seed=SEED):
 	bestParams['input_shape'] = X.shape[1]
 	bestParams['output_shape'] = 1
 
-	print "Saving the best parameters: ", bestParams
+	print("Saving the best parameters: ", bestParams)
 
 	pickle.dump(bestParams, open('bestParams_knn.pickle', 'wb'))
 	return bestParams
@@ -407,7 +407,7 @@ def do_bayes_search(X, y, cv=3, testSize=0.3):
 	if os.path.exists('bestParams.pickle'):
 		return pickle.load(open('bestParams.pickle', 'rb'))
 
-	print "Performing Bayesian search..."
+	print("Performing Bayesian search...")
 	from bayes_opt.bayesian_optimization import BayesianOptimization
 	import warnings
 	warnings.filterwarnings("ignore")
@@ -446,7 +446,7 @@ def do_bayes_search(X, y, cv=3, testSize=0.3):
 		}
 
 		results = list()
-		for i in xrange(cv):
+		for i in range(cv):
 			X_train, X_test, y_train, y_test = train_test_split(
 				X, y, test_size=testSize, stratify=y, random_state=seed+i
 			)
@@ -464,7 +464,7 @@ def do_bayes_search(X, y, cv=3, testSize=0.3):
 			preds = model.predict(xg_test, ntree_limit=model.best_iteration)
 			results.append(eval_auc(preds, xg_test)[1])
 
-		print "Outcomes: ", results
+		print("Outcomes: ", results)
 		return np.mean(results)
 
 	xgboostBO = BayesianOptimization(
@@ -486,7 +486,7 @@ def do_bayes_search(X, y, cv=3, testSize=0.3):
 		}
 	)
 	xgboostBO.maximize(init_points=20, restarts=15, n_iter=50)
-	print 'XGBOOST: %f' % xgboostBO.res['max']['max_val']
+	print('XGBOOST: %f' % xgboostBO.res['max']['max_val'])
 	bestParams = xgboostBO.res['max']['max_params']
 	bestParams['max_depth'] = int(round(bestParams['max_depth']))
 	bestParams['num_round'] = int(round(bestParams['num_round']))
@@ -518,11 +518,11 @@ def do_random_search(X, y, nIter=3,
 	def report(grid_scores):
 		top_scores = sorted(grid_scores, key=lambda x: x[1], reverse=True)
 		for i, score in enumerate(top_scores):
-			print("Model with rank: {0}".format(i + 1))
-			print("Mean validation score: {0:.3f} (std: {1:.3f})".format(
+			print(("Model with rank: {0}".format(i + 1)))
+			print(("Mean validation score: {0:.3f} (std: {1:.3f})".format(
 				  score.mean_validation_score,
-				  np.std(score.cv_validation_scores)))
-			print("Parameters: {0}".format(score.parameters))
+				  np.std(score.cv_validation_scores))))
+			print(("Parameters: {0}".format(score.parameters)))
 			print("")
 		return top_scores[0]
 
@@ -542,33 +542,33 @@ def do_random_search(X, y, nIter=3,
 		randomSearchCV.fit(X, y)
 		report(randomSearchCV.grid_scores_)
 		bestParams = randomSearchCV.best_params_
-		print bestParams
+		print(bestParams)
 		pickle.dump(bestParams, open(gridpickle, 'wb'))
 
 	return bestParams
 
 def print_feature_importance(model, cols):
 	fmap = model.get_fscore()
-	print "There are %d cols and only %d are used." % (len(cols), len(fmap.keys()))
+	print("There are %d cols and only %d are used." % (len(cols), len(list(fmap.keys()))))
 	sortedList = list()
-	for feat, score in sorted(fmap.items(), key=lambda x: x[1], reverse=True):
+	for feat, score in sorted(list(fmap.items()), key=lambda x: x[1], reverse=True):
 		feat_idx = int(feat[1:])
 		sortedList.append([feat_idx, fmap[feat], cols[feat_idx]])
-		print sortedList[-1]
+		print(sortedList[-1])
 
 	return sortedList
 
 def print_confusion_matrix(label, preds, labels=None):
 	cm = confusion_matrix(label, preds, labels=labels)
-	print "confusion matrix:"
-	print "label=class0, pred=class0", cm[0][0]
-	print "label=class1, pred=class1", cm[1][1]
-	print "label=class0, pred=class1", cm[0][1]
-	print "label=class1, pred=class0", cm[1][0]
-	print "Class0 True rate", cm[0][0]/float(cm[0][0]+cm[0][1])
-	print "Class1 True rate", cm[1][1]/float(cm[1][1]+cm[1][0])
-	print "Class0 False rate", cm[0][1]/float(cm[0][0]+cm[0][1])
-	print "Class1 False rate", cm[1][0]/float(cm[1][1]+cm[1][0])
+	print("confusion matrix:")
+	print("label=class0, pred=class0", cm[0][0])
+	print("label=class1, pred=class1", cm[1][1])
+	print("label=class0, pred=class1", cm[0][1])
+	print("label=class1, pred=class0", cm[1][0])
+	print("Class0 True rate", cm[0][0]/float(cm[0][0]+cm[0][1]))
+	print("Class1 True rate", cm[1][1]/float(cm[1][1]+cm[1][0]))
+	print("Class0 False rate", cm[0][1]/float(cm[0][0]+cm[0][1]))
+	print("Class1 False rate", cm[1][0]/float(cm[1][1]+cm[1][0]))
 
 def get_confusion_rates(label, preds, labels=None):
 	cm = confusion_matrix(label, preds, labels=labels)

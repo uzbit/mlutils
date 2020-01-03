@@ -91,7 +91,7 @@ class MetaClassifier(BaseEstimator, ClassifierMixin):
 		self.classes_ = self.labelBinarizer.classes_
 
 		for name, preproc, est in self.__estimators:
-			if self.__verbose: print "Fitting estimator %s" % name
+			if self.__verbose: print("Fitting estimator %s" % name)
 			est.fit(self.applyPreproc(preproc, X), y)
 
 		self.getFeatureImportance()
@@ -171,11 +171,11 @@ class MetaClassifier(BaseEstimator, ClassifierMixin):
 			x = np.array(x)
 
 		if preproc == 'scale':
-			if self.__verbose: print "preproc: StandardScaler"
+			if self.__verbose: print("preproc: StandardScaler")
 			x_ = self.standardScaler.transform(x)
 			return x_.astype(np.float32)
 		if preproc:
-			if self.__verbose: print "preproc:", preproc
+			if self.__verbose: print("preproc:", preproc)
 			x_ = np.copy(x)
 			x_ = preproc(x_)
 			return x_.astype(np.float32)

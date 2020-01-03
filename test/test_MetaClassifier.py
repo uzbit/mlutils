@@ -1,9 +1,9 @@
 
 import unittest, os
 import numpy as np
-import cPickle as pickle
+import pickle as pickle
 from sklearn import datasets
-from sklearn.cross_validation import train_test_split
+from sklearn.model_selection import train_test_split
 from mlutils.MetaClassifier import MetaClassifier
 from mlutils.mlutils import get_auc
 
